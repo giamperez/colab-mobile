@@ -1,0 +1,51 @@
+﻿# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Native builds & keys
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# Android
+android/build/
+android/app/build/
+android/.gradle/
+android/app/.cxx/
+android/local.properties
+*.apk
+*.aab
+
+# iOS
+ios/build/
+ios/Pods/
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
