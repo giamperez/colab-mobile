@@ -5,393 +5,573 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  TextInput,
   ActivityIndicator,
   Alert,
   Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { reportsApi } from '../api/reports.api';
-import { groupsApi } from '../api/groups.api';
+import { extractArray } from '../api/utils';
 import { BottomNavBar } from '../components/BottomNavBar';
-import type { Group } from '../types';
+import { AppHeader } from '../components/AppHeader';
+import { AppDatePicker } from '../components/AppDatePicker';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext';
+import type { Report } from '../types';
+import dayjs from 'dayjs';
 
 export const ReportsScreen = () => {
-  const [reportType, setReportType] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
-  const [selectedGroupId, setSelectedGroupId] = useState<number | undefined>(undefined);
-  const [generatedReport, setGeneratedReport] = useState<any>(null);
+  const queryClient = useQueryClient();
+  const { colors, isDark } = useTheme();
+  const [activeTab, setActiveTab] = useState<'generate' | 'history'>('generate');
+  const [reportType, setReportType] = useState<'daily' | 'weekly' | 'monthly'>('daily');
 
-  const { data: groups = [] } = useQuery<Group[]>({
-    queryKey: ['groups-list'],
-    queryFn: () => groupsApi.getAll().then((res) => res.data),
+  const today = new Date().toISOString().split('T')[0];
+  const [dateFrom, setDateFrom] = useState(today);
+  const [dateTo, setDateTo] = useState(today);
+
+  const [generatedContent, setGeneratedContent] = useState<string | null>(null);
+
+  // Fetch report history
+  const { data: rawReports, isLoading: isLoadingHistory, refetch: refetchHistory } = useQuery({
+    queryKey: ['reports-history'],
+    queryFn: () => reportsApi.getAll().then((res) => res.data),
   });
 
-  const { data: weeklyTrend, isLoading: loadingTrend } = useQuery({
-    queryKey: ['weekly-trend'],
-    queryFn: () => reportsApi.getWeeklyTrend().then((res) => res.data),
-    retry: false,
-  });
+  const reports: Report[] = extractArray<Report>(rawReports);
 
+  // Generate Report Mutation
   const generateMutation = useMutation({
-    mutationFn: (dto: any) => reportsApi.generate(dto).then((res) => res.data),
-    onSuccess: (data: any) => {
-      setGeneratedReport(data);
+    mutationFn: async () => {
+      const payload = { from: dateFrom, to: dateTo, type: reportType };
+      if (reportType === 'daily') return (await reportsApi.generateDaily(payload)).data;
+      if (reportType === 'monthly') return (await reportsApi.generateMonthly(payload)).data;
+      return (await reportsApi.generateWeekly(payload)).data;
+    },
+    onSuccess: (data) => {
+      const content =
+        typeof data === 'string'
+          ? data
+          : data?.content || data?.report || data?.text || JSON.stringify(data, null, 2);
+      setGeneratedContent(content);
     },
     onError: (err: any) => {
-      Alert.alert('Error', err.response?.data?.message || 'No se pudo generar el reporte.');
+      Alert.alert(
+        'Error al generar reporte',
+        err.response?.data?.message || 'No se pudo generar el reporte.'
+      );
     },
   });
 
-  const sendTelegramMutation = useMutation({
-    mutationFn: (dto: any) => reportsApi.sendTelegram(dto).then((res) => res.data),
+  // Save Report Mutation
+  const saveMutation = useMutation({
+    mutationFn: (contentToSave: string) =>
+      reportsApi.save({
+        type: reportType,
+        content: contentToSave,
+        channel: 'mobile',
+      }),
     onSuccess: () => {
-      Alert.alert('¡Enviado!', 'El reporte ha sido enviado exitosamente al canal de Telegram.');
-    },
-    onError: (err: any) => {
-      Alert.alert('Error', err.response?.data?.message || 'Falló el envío por Telegram.');
+      Alert.alert('Guardado', 'El reporte se guardó correctamente en el historial.');
+      queryClient.invalidateQueries({ queryKey: ['reports-history'] });
     },
   });
 
-  const handleGenerate = () => {
-    generateMutation.mutate({
-      type: reportType,
-      channel: 'mobile',
-      group_id: selectedGroupId,
-    });
-  };
-
-  const handleSendTelegram = () => {
-    if (!generatedReport) return;
-    sendTelegramMutation.mutate({
-      type: reportType,
-      channel: 'general',
-      content: generatedReport.summary || JSON.stringify(generatedReport),
-      group_id: selectedGroupId,
-    });
-  };
-
-  const handleShareNative = async () => {
-    if (!generatedReport) return;
+  const handleShare = async (text: string) => {
     try {
       await Share.share({
-        message: `📊 Reporte Ejecutivo (${reportType.toUpperCase()})\n\n${
-          generatedReport.summary || JSON.stringify(generatedReport)
-        }`,
+        message: text,
+        title: `Reporte ${reportType.toUpperCase()} - COLAB`,
       });
-    } catch (e) {
-      // cancel or error
+    } catch {
+      // Ignored
     }
   };
 
   return (
-    <View style={styles.flexContainer}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Informes y Reportes</Text>
-          <Text style={styles.subtitle}>
-            Genera métricas consolidadas, tendencias semanales e informes ejecutivos para compartir.
-          </Text>
-        </View>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bgPrimary }]} edges={['top']}>
+      <AppHeader
+        title="Reportes Ejecutivos"
+        subtitle="Genera y consulta resúmenes de rendimiento con IA"
+      />
 
-        {/* Tipo de Reporte */}
-        <Text style={styles.label}>Periodo del Reporte</Text>
-        <View style={styles.pillRow}>
-          {[
-            { id: 'daily', label: 'Diario' },
-            { id: 'weekly', label: 'Semanal' },
-            { id: 'monthly', label: 'Mensual' },
-          ].map((t) => (
-            <TouchableOpacity
-              key={t.id}
-              style={[
-                styles.pill,
-                reportType === t.id && styles.pillActive,
-              ]}
-              onPress={() => setReportType(t.id as any)}
-            >
-              <Text
-                style={[
-                  styles.pillText,
-                  reportType === t.id && styles.pillTextActive,
-                ]}
-              >
-                {t.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Grupo o Área */}
-        <Text style={styles.label}>Filtrar por Área / Grupo</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-          <TouchableOpacity
-            style={[
-              styles.pill,
-              selectedGroupId === undefined && styles.pillActive,
-              { marginRight: 8 },
-            ]}
-            onPress={() => setSelectedGroupId(undefined)}
-          >
-            <Text
-              style={[
-                styles.pillText,
-                selectedGroupId === undefined && styles.pillTextActive,
-              ]}
-            >
-              Todas las áreas
-            </Text>
-          </TouchableOpacity>
-          {groups.map((g: Group) => (
-            <TouchableOpacity
-              key={g.id}
-              style={[
-                styles.pill,
-                selectedGroupId === g.id && styles.pillActive,
-                { marginRight: 8 },
-              ]}
-              onPress={() => setSelectedGroupId(g.id)}
-            >
-              <Text
-                style={[
-                  styles.pillText,
-                  selectedGroupId === g.id && styles.pillTextActive,
-                ]}
-              >
-                {g.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Botón Generar */}
+      {/* Tabs */}
+      <View
+        style={[
+          styles.tabsRow,
+          {
+            backgroundColor: colors.bgSecondary,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
         <TouchableOpacity
-          style={[styles.generateBtn, generateMutation.isPending && { opacity: 0.7 }]}
-          onPress={handleGenerate}
-          disabled={generateMutation.isPending}
+          style={[
+            styles.tab,
+            activeTab === 'generate' && { borderBottomColor: colors.primary },
+          ]}
+          onPress={() => setActiveTab('generate')}
         >
-          {generateMutation.isPending ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <>
-              <Ionicons name="pie-chart-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.generateBtnText}>Generar Reporte Ahora</Text>
-            </>
-          )}
+          <Ionicons
+            name="document-text-outline"
+            size={16}
+            color={activeTab === 'generate' ? colors.primary : colors.textSecondary}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              { color: colors.textSecondary },
+              activeTab === 'generate' && { color: colors.primary, fontWeight: '800' },
+            ]}
+          >
+            Generar Reporte
+          </Text>
         </TouchableOpacity>
 
-        {/* Resultado del Reporte */}
-        {generatedReport && (
-          <View style={styles.reportCard}>
-            <View style={styles.reportHeader}>
-              <Ionicons name="document-text-outline" size={22} color="#009497" />
-              <Text style={styles.reportTitle}>Reporte Generado</Text>
-            </View>
-            <Text style={styles.reportText}>
-              {generatedReport.summary || JSON.stringify(generatedReport, null, 2)}
-            </Text>
+        <TouchableOpacity
+          style={[
+            styles.tab,
+            activeTab === 'history' && { borderBottomColor: colors.primary },
+          ]}
+          onPress={() => {
+            setActiveTab('history');
+            refetchHistory();
+          }}
+        >
+          <Ionicons
+            name="time-outline"
+            size={16}
+            color={activeTab === 'history' ? colors.primary : colors.textSecondary}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              { color: colors.textSecondary },
+              activeTab === 'history' && { color: colors.primary, fontWeight: '800' },
+            ]}
+          >
+            Historial ({reports.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-            <View style={styles.actionRow}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        {activeTab === 'generate' ? (
+          <>
+            {/* Options Card */}
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: colors.bgSecondary,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Text style={[styles.label, { color: colors.textSecondary }]}>PERIODO / TIPO DE REPORTE</Text>
+              <View style={styles.typeGrid}>
+                {[
+                  { id: 'daily', label: 'Diario' },
+                  { id: 'weekly', label: 'Semanal' },
+                  { id: 'monthly', label: 'Mensual' },
+                ].map((t) => (
+                  <TouchableOpacity
+                    key={t.id}
+                    style={[
+                      styles.typePill,
+                      {
+                        backgroundColor: colors.bgSurface,
+                        borderColor: colors.border,
+                      },
+                      reportType === t.id && {
+                        backgroundColor: colors.primary,
+                        borderColor: colors.primary,
+                      },
+                    ]}
+                    onPress={() => setReportType(t.id as any)}
+                  >
+                    <Text
+                      style={[
+                        styles.typePillText,
+                        { color: colors.textSecondary },
+                        reportType === t.id && { color: '#FFFFFF', fontWeight: '800' },
+                      ]}
+                    >
+                      {t.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.datesRow}>
+                <View style={{ flex: 1 }}>
+                  <AppDatePicker
+                    label="DESDE"
+                    value={dateFrom}
+                    onChange={(d) => setDateFrom(d)}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppDatePicker
+                    label="HASTA"
+                    value={dateTo}
+                    onChange={(d) => setDateTo(d)}
+                  />
+                </View>
+              </View>
+
               <TouchableOpacity
-                style={styles.shareBtn}
-                onPress={handleShareNative}
+                style={[
+                  styles.generateBtn,
+                  {
+                    backgroundColor: colors.primary,
+                    shadowColor: colors.primary,
+                  },
+                  generateMutation.isPending && { opacity: 0.7 },
+                ]}
+                onPress={() => generateMutation.mutate()}
+                disabled={generateMutation.isPending}
               >
-                <Ionicons name="share-social-outline" size={16} color="#009497" />
-                <Text style={styles.shareBtnText}>Compartir</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.telegramBtn}
-                onPress={handleSendTelegram}
-                disabled={sendTelegramMutation.isPending}
-              >
-                <Ionicons name="paper-plane-outline" size={16} color="#FFFFFF" />
-                <Text style={styles.telegramBtnText}>Enviar a Telegram</Text>
+                {generateMutation.isPending ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <View style={styles.btnContent}>
+                    <Ionicons name="sparkles" size={18} color="#FFFFFF" />
+                    <Text style={styles.generateBtnText}>SINTETIZAR REPORTE</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
-          </View>
-        )}
 
-        {/* Tendencias Semanales */}
-        <Text style={[styles.label, { marginTop: 24 }]}>Tendencias de la Semana</Text>
-        {loadingTrend ? (
-          <ActivityIndicator color="#009497" style={{ marginVertical: 20 }} />
+            {/* Generated Report View */}
+            {generatedContent && (
+              <View
+                style={[
+                  styles.resultCard,
+                  {
+                    backgroundColor: colors.bgSecondary,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <View style={[styles.resultHeader, { borderBottomColor: colors.borderSubtle }]}>
+                  <View style={styles.resultTitleRow}>
+                    <Ionicons name="document-text" size={20} color={colors.primary} />
+                    <Text style={[styles.resultTitle, { color: colors.textPrimary }]}>
+                      Resumen Ejecutivo ({reportType.toUpperCase()})
+                    </Text>
+                  </View>
+                  <View style={styles.actionIcons}>
+                    <TouchableOpacity
+                      style={[styles.iconBtn, { backgroundColor: colors.primaryMuted }]}
+                      onPress={() => handleShare(generatedContent)}
+                    >
+                      <Ionicons name="share-social-outline" size={18} color={colors.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.iconBtn, { backgroundColor: colors.primaryMuted }]}
+                      onPress={() => saveMutation.mutate(generatedContent)}
+                      disabled={saveMutation.isPending}
+                    >
+                      <Ionicons name="save-outline" size={18} color={colors.primary} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <Text style={[styles.reportContentText, { color: colors.textPrimary }]}>{generatedContent}</Text>
+              </View>
+            )}
+          </>
         ) : (
-          <View style={styles.trendCard}>
-            <View style={styles.trendHeader}>
-              <Ionicons name="trending-up-outline" size={20} color="#10B981" />
-              <Text style={styles.trendTitle}>Rendimiento del Equipo</Text>
-            </View>
-            <Text style={styles.trendDesc}>
-              {weeklyTrend?.summary || 'Métricas de avance semanal acumuladas.'}
-            </Text>
+          /* History View */
+          <View style={styles.historyContainer}>
+            {isLoadingHistory ? (
+              <ActivityIndicator color={colors.primary} style={{ marginTop: 30 }} />
+            ) : reports.length === 0 ? (
+              <View style={styles.emptyBox}>
+                <Ionicons name="folder-open-outline" size={40} color={colors.textMuted} />
+                <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>Sin reportes guardados</Text>
+                <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+                  Genera un reporte y guárdalo para consultarlo cuando quieras.
+                </Text>
+              </View>
+            ) : (
+              reports.map((r) => (
+                <View
+                  key={r.id}
+                  style={[
+                    styles.historyCard,
+                    {
+                      backgroundColor: colors.bgSecondary,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <View style={styles.historyHeader}>
+                    <View style={[styles.typeBadge, { backgroundColor: colors.primaryMuted }]}>
+                      <Text style={[styles.typeBadgeText, { color: colors.primary }]}>
+                        {r.type?.toUpperCase() || r.tipo?.toUpperCase() || 'REPORTE'}
+                      </Text>
+                    </View>
+                    <Text style={[styles.historyDate, { color: colors.textMuted }]}>
+                      {dayjs(r.created_at || r.createdAt).format('DD MMM YYYY, HH:mm')}
+                    </Text>
+                  </View>
+
+                  <Text style={[styles.historyContent, { color: colors.textSecondary }]} numberOfLines={4}>
+                    {r.content || r.contenido}
+                  </Text>
+
+                  <TouchableOpacity
+                    style={[styles.historyShareBtn, { backgroundColor: colors.bgSurface }]}
+                    onPress={() => handleShare(r.content || r.contenido || '')}
+                  >
+                    <Ionicons name="share-social-outline" size={14} color={colors.primary} />
+                    <Text style={[styles.historyShareText, { color: colors.primary }]}>Compartir</Text>
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
           </View>
         )}
 
-        <View style={{ height: 40 }} />
+        <View style={{ height: 30 }} />
       </ScrollView>
 
       <BottomNavBar />
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  flexContainer: {
+  container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  container: {
-    paddingHorizontal: 20,
-    paddingTop: 50,
-  },
-  header: {
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#0F172A',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: '#64748B',
-    lineHeight: 18,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#334155',
-    marginBottom: 8,
-    marginTop: 8,
-  },
-  pillRow: {
+  tabsRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  pill: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingHorizontal: 16,
   },
-  pillActive: {
-    backgroundColor: '#009497',
-    borderColor: '#009497',
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    marginRight: 20,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
-  pillText: {
-    fontSize: 12,
+  tabActive: {
+    borderBottomColor: '#009497',
+  },
+  tabText: {
+    fontSize: 13,
     fontWeight: '700',
     color: '#64748B',
   },
-  pillTextActive: {
-    color: '#FFFFFF',
+  tabTextActive: {
+    color: '#009497',
+    fontWeight: '800',
   },
-  generateBtn: {
+  scroll: {
+    flex: 1,
+  },
+  content: {
+    padding: 16,
+    gap: 16,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  label: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+    marginTop: 8,
+  },
+  typeGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#009497',
-    borderRadius: 16,
-    paddingVertical: 14,
     gap: 8,
     marginTop: 4,
+    marginBottom: 8,
+  },
+  typePill: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  typePillActive: {
+    backgroundColor: '#009497',
+    borderColor: '#009497',
+  },
+  typePillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  typePillTextActive: {
+    color: '#FFFFFF',
+  },
+  datesRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  input: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: '#0F172A',
+  },
+  generateBtn: {
+    backgroundColor: '#009497',
+    paddingVertical: 15,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginTop: 20,
     elevation: 3,
     shadowColor: '#009497',
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
+  },
+  btnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   generateBtnText: {
     color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 15,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
-  reportCard: {
+  resultCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 18,
-    marginTop: 20,
+    borderRadius: 24,
+    padding: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  reportHeader: {
+  resultHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  resultTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 10,
   },
-  reportTitle: {
-    fontSize: 16,
+  resultTitle: {
+    fontSize: 14,
     fontWeight: '800',
     color: '#0F172A',
   },
-  reportText: {
+  actionIcons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  iconBtn: {
+    padding: 6,
+    borderRadius: 10,
+    backgroundColor: '#E2F5F3',
+  },
+  reportContentText: {
     fontSize: 13,
     color: '#334155',
     lineHeight: 20,
-    marginBottom: 16,
   },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 10,
+  historyContainer: {
+    gap: 12,
   },
-  shareBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#009497',
-    backgroundColor: '#E2F5F3',
-    gap: 6,
-  },
-  shareBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#009497',
-  },
-  telegramBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: '#0088CC',
-    gap: 6,
-  },
-  telegramBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  trendCard: {
+  historyCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    padding: 18,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  trendHeader: {
+  historyHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
-  trendTitle: {
-    fontSize: 15,
+  typeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: '#E2F5F3',
+  },
+  typeBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#009497',
+  },
+  historyDate: {
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  historyContent: {
+    fontSize: 12,
+    color: '#475569',
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  historyShareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+  },
+  historyShareText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#009497',
+  },
+  emptyBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 50,
+  },
+  emptyTitle: {
+    fontSize: 16,
     fontWeight: '800',
     color: '#0F172A',
+    marginTop: 10,
   },
-  trendDesc: {
-    fontSize: 13,
+  emptySubtitle: {
+    fontSize: 12,
     color: '#64748B',
-    lineHeight: 18,
+    textAlign: 'center',
+    marginTop: 4,
+    maxWidth: 240,
   },
 });
 

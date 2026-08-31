@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../context/ThemeContext';
 import type { Group } from '../types';
 
 interface GroupModalProps {
@@ -21,15 +22,15 @@ interface GroupModalProps {
 }
 
 const COLOR_PALETTE = [
+  '#7C83FF',
+  '#9C8CFF',
+  '#5EE0C0',
   '#009497',
-  '#0080a3',
-  '#534AB7',
-  '#D85A30',
+  '#FF9E6D',
+  '#FF7BA9',
   '#BA7517',
   '#10B981',
   '#EF4444',
-  '#EC4899',
-  '#8B5CF6',
   '#64748B',
 ];
 
@@ -39,19 +40,20 @@ export const GroupModal: React.FC<GroupModalProps> = ({
   onSubmit,
   initialGroup,
 }) => {
+  const { colors, isDark } = useTheme();
   const [name, setName] = useState('');
-  const [color, setColor] = useState('#009497');
+  const [color, setColor] = useState('#7C83FF');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (initialGroup) {
       setName(initialGroup.name || '');
-      setColor(initialGroup.color || '#009497');
+      setColor(initialGroup.color || '#7C83FF');
       setDescription(initialGroup.description || '');
     } else {
       setName('');
-      setColor('#009497');
+      setColor('#7C83FF');
       setDescription('');
     }
   }, [initialGroup, visible]);
@@ -83,26 +85,42 @@ export const GroupModal: React.FC<GroupModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.overlay}>
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>
+        <View
+          style={[
+            styles.container,
+            {
+              backgroundColor: colors.bgSecondary,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <View style={[styles.header, { borderBottomColor: colors.borderSubtle }]}>
+            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
               {initialGroup ? 'Editar Grupo' : 'Nuevo Grupo'}
             </Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={24} color="#64748B" />
+              <Ionicons name="close" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-            <Text style={styles.label}>Nombre del Grupo *</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Nombre del Grupo *</Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.bgSurface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
               placeholder="Ej: Marketing, Ventas, TI"
+              placeholderTextColor={colors.textMuted}
               value={name}
               onChangeText={setName}
             />
 
-            <Text style={styles.label}>Color Identificador</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Color Identificador</Text>
             <View style={styles.colorPalette}>
               {COLOR_PALETTE.map((c) => (
                 <TouchableOpacity
@@ -110,17 +128,26 @@ export const GroupModal: React.FC<GroupModalProps> = ({
                   style={[
                     styles.colorCircle,
                     { backgroundColor: c },
-                    color === c && styles.colorCircleActive,
+                    color === c && { borderColor: isDark ? '#FFFFFF' : '#0F172A' },
                   ]}
                   onPress={() => setColor(c)}
                 />
               ))}
             </View>
 
-            <Text style={styles.label}>Descripción</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Descripción</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
+              style={[
+                styles.input,
+                styles.textArea,
+                {
+                  backgroundColor: colors.bgSurface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
               placeholder="Propósito u observaciones del grupo..."
+              placeholderTextColor={colors.textMuted}
               value={description}
               onChangeText={setDescription}
               multiline
@@ -130,12 +157,21 @@ export const GroupModal: React.FC<GroupModalProps> = ({
             <View style={{ height: 20 }} />
           </ScrollView>
 
-          <View style={styles.footer}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-              <Text style={styles.cancelBtnText}>Cancelar</Text>
+          <View style={[styles.footer, { borderTopColor: colors.borderSubtle }]}>
+            <TouchableOpacity
+              style={[styles.cancelBtn, { backgroundColor: colors.bgSurface }]}
+              onPress={onClose}
+            >
+              <Text style={[styles.cancelBtnText, { color: colors.textSecondary }]}>Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.submitBtn, { backgroundColor: color }]}
+              style={[
+                styles.submitBtn,
+                {
+                  backgroundColor: color,
+                  shadowColor: color,
+                },
+              ]}
               onPress={handleSubmit}
               disabled={loading}
             >

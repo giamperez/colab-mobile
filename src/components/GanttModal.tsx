@@ -11,6 +11,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { AppDatePicker } from './AppDatePicker';
+import { useTheme } from '../context/ThemeContext';
 import type { GanttItem, Group } from '../types';
 
 interface GanttModalProps {
@@ -22,13 +24,13 @@ interface GanttModalProps {
 }
 
 const TYPE_OPTIONS = [
-  { id: 'lanzamiento', label: '🚀 Lanzamiento', defaultColor: '#009497' },
-  { id: 'campaña', label: '📢 Campaña', defaultColor: '#D85A30' },
-  { id: 'webinar', label: '🎙️ Webinar', defaultColor: '#0080a3' },
-  { id: 'programa', label: '📚 Programa', defaultColor: '#534AB7' },
-  { id: 'tarea', label: '✅ Tarea', defaultColor: '#888780' },
+  { id: 'lanzamiento', label: '🚀 Lanzamiento', defaultColor: '#7C83FF' },
+  { id: 'campaña', label: '📢 Campaña', defaultColor: '#FF9E6D' },
+  { id: 'webinar', label: '🎙️ Webinar', defaultColor: '#9C8CFF' },
+  { id: 'programa', label: '📚 Programa', defaultColor: '#5EE0C0' },
+  { id: 'tarea', label: '✅ Tarea', defaultColor: '#009497' },
   { id: 'evento', label: '📅 Evento', defaultColor: '#BA7517' },
-  { id: 'otro', label: '📌 Otro', defaultColor: '#639922' },
+  { id: 'otro', label: '📌 Otro', defaultColor: '#FF7BA9' },
 ];
 
 export const GanttModal: React.FC<GanttModalProps> = ({
@@ -38,10 +40,11 @@ export const GanttModal: React.FC<GanttModalProps> = ({
   initialItem,
   groups,
 }) => {
+  const { colors, isDark } = useTheme();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState('lanzamiento');
-  const [color, setColor] = useState('#009497');
+  const [color, setColor] = useState('#7C83FF');
   const [startDate, setStartDate] = useState(
     new Date().toISOString().split('T')[0]
   );
@@ -56,7 +59,7 @@ export const GanttModal: React.FC<GanttModalProps> = ({
       setTitle(initialItem.title || '');
       setDescription(initialItem.description || '');
       setType(initialItem.type || 'lanzamiento');
-      setColor(initialItem.color || '#009497');
+      setColor(initialItem.color || '#7C83FF');
       setStartDate(initialItem.start_date ? initialItem.start_date.split('T')[0] : new Date().toISOString().split('T')[0]);
       setEndDate(initialItem.end_date ? initialItem.end_date.split('T')[0] : new Date().toISOString().split('T')[0]);
       setGroupId(initialItem.group_id || null);
@@ -64,7 +67,7 @@ export const GanttModal: React.FC<GanttModalProps> = ({
       setTitle('');
       setDescription('');
       setType('lanzamiento');
-      setColor('#009497');
+      setColor('#7C83FF');
       setStartDate(new Date().toISOString().split('T')[0]);
       setEndDate(
         new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
@@ -107,42 +110,71 @@ export const GanttModal: React.FC<GanttModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.overlay}>
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>
+        <View
+          style={[
+            styles.container,
+            {
+              backgroundColor: colors.bgSecondary,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <View style={[styles.header, { borderBottomColor: colors.borderSubtle }]}>
+            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
               {initialItem ? 'Editar Proyecto Gantt' : 'Nuevo Proyecto Gantt'}
             </Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={24} color="#64748B" />
+              <Ionicons name="close" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-            <Text style={styles.label}>Título del Proyecto *</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Título del Proyecto *</Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.bgSurface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
               placeholder="Ej: Lanzamiento Curso IA"
+              placeholderTextColor={colors.textMuted}
               value={title}
               onChangeText={setTitle}
             />
 
-            <Text style={styles.label}>Descripción</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Descripción</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
+              style={[
+                styles.input,
+                styles.textArea,
+                {
+                  backgroundColor: colors.bgSurface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
               placeholder="Detalles sobre el proyecto..."
+              placeholderTextColor={colors.textMuted}
               value={description}
               onChangeText={setDescription}
               multiline
               numberOfLines={3}
             />
 
-            <Text style={styles.label}>Tipo de Proyecto</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Tipo de Proyecto</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.rowScroll}>
               {TYPE_OPTIONS.map((opt) => (
                 <TouchableOpacity
                   key={opt.id}
                   style={[
                     styles.typePill,
+                    {
+                      backgroundColor: colors.bgSurface,
+                      borderColor: colors.border,
+                    },
                     type === opt.id && {
                       backgroundColor: opt.defaultColor,
                       borderColor: opt.defaultColor,
@@ -153,7 +185,8 @@ export const GanttModal: React.FC<GanttModalProps> = ({
                   <Text
                     style={[
                       styles.typeText,
-                      type === opt.id && styles.typeTextActive,
+                      { color: colors.textSecondary },
+                      type === opt.id && { color: '#FFFFFF', fontWeight: '800' },
                     ]}
                   >
                     {opt.label}
@@ -164,35 +197,35 @@ export const GanttModal: React.FC<GanttModalProps> = ({
 
             <View style={styles.dateRow}>
               <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={styles.label}>Fecha Inicio</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="YYYY-MM-DD"
+                <AppDatePicker
+                  label="Fecha Inicio"
                   value={startDate}
-                  onChangeText={setStartDate}
+                  onChange={(d) => setStartDate(d)}
                 />
               </View>
               <View style={{ flex: 1, marginLeft: 8 }}>
-                <Text style={styles.label}>Fecha Fin</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="YYYY-MM-DD"
+                <AppDatePicker
+                  label="Fecha Fin"
                   value={endDate}
-                  onChangeText={setEndDate}
+                  onChange={(d) => setEndDate(d)}
                 />
               </View>
             </View>
 
-            <Text style={styles.label}>Grupo Responsable</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Grupo Responsable</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.rowScroll}>
               {groups.map((g) => (
                 <TouchableOpacity
                   key={g.id}
                   style={[
                     styles.typePill,
+                    {
+                      backgroundColor: colors.bgSurface,
+                      borderColor: colors.border,
+                    },
                     groupId === g.id && {
-                      backgroundColor: g.color || '#009497',
-                      borderColor: g.color || '#009497',
+                      backgroundColor: g.color || colors.primary,
+                      borderColor: g.color || colors.primary,
                     },
                   ]}
                   onPress={() => setGroupId(g.id)}
@@ -200,7 +233,8 @@ export const GanttModal: React.FC<GanttModalProps> = ({
                   <Text
                     style={[
                       styles.typeText,
-                      groupId === g.id && styles.typeTextActive,
+                      { color: colors.textSecondary },
+                      groupId === g.id && { color: '#FFFFFF', fontWeight: '800' },
                     ]}
                   >
                     {g.name}
@@ -212,12 +246,21 @@ export const GanttModal: React.FC<GanttModalProps> = ({
             <View style={{ height: 20 }} />
           </ScrollView>
 
-          <View style={styles.footer}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-              <Text style={styles.cancelBtnText}>Cancelar</Text>
+          <View style={[styles.footer, { borderTopColor: colors.borderSubtle }]}>
+            <TouchableOpacity
+              style={[styles.cancelBtn, { backgroundColor: colors.bgSurface }]}
+              onPress={onClose}
+            >
+              <Text style={[styles.cancelBtnText, { color: colors.textSecondary }]}>Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.submitBtn}
+              style={[
+                styles.submitBtn,
+                {
+                  backgroundColor: colors.primary,
+                  shadowColor: colors.primary,
+                },
+              ]}
               onPress={handleSubmit}
               disabled={loading}
             >

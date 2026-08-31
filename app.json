@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Comovamos Mobile",
+    "name": "Colab Mobile",
     "slug": "comovamos-mobile",
     "platforms": [
       "ios",
@@ -29,10 +29,26 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.giamperez.comovamosmobile"
+      "package": "com.comovamosmobile"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Colab necesita acceso al micrófono para transcribir lo que dictas.",
+          "speechRecognitionPermission": "Colab necesita permiso de reconocimiento de voz para transcribir lo que dictas.",
+          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "6078789d-219a-43b3-9ffb-fb3c0dcee2e2"
+      }
+    },
+    "owner": "giampe"
   }
 }

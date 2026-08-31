@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 interface ChangePinModalProps {
   visible: boolean;
@@ -22,6 +23,7 @@ export const ChangePinModal: React.FC<ChangePinModalProps> = ({
   onClose,
 }) => {
   const { changePin } = useAuth();
+  const { colors, isDark } = useTheme();
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -59,39 +61,72 @@ export const ChangePinModal: React.FC<ChangePinModalProps> = ({
   return (
     <Modal visible={visible} animationType="fade" transparent>
       <View style={styles.overlay}>
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Cambiar PIN de Acceso</Text>
+        <View
+          style={[
+            styles.container,
+            {
+              backgroundColor: colors.bgSecondary,
+              borderColor: colors.border,
+              borderWidth: 1,
+            },
+          ]}
+        >
+          <View style={[styles.header, { borderBottomColor: colors.borderSubtle }]}>
+            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Cambiar PIN de Acceso</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={24} color="#64748B" />
+              <Ionicons name="close" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
           <View style={styles.body}>
-            <Text style={styles.label}>PIN Actual</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>PIN Actual</Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.bgSurface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
               placeholder="Ingresa tu PIN actual"
+              placeholderTextColor={colors.textMuted}
               value={currentPin}
               onChangeText={setCurrentPin}
               secureTextEntry
               keyboardType="number-pad"
             />
 
-            <Text style={styles.label}>Nuevo PIN</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Nuevo PIN</Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.bgSurface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
               placeholder="Ingresa tu nuevo PIN"
+              placeholderTextColor={colors.textMuted}
               value={newPin}
               onChangeText={setNewPin}
               secureTextEntry
               keyboardType="number-pad"
             />
 
-            <Text style={styles.label}>Confirmar Nuevo PIN</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Confirmar Nuevo PIN</Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.bgSurface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
               placeholder="Repite el nuevo PIN"
+              placeholderTextColor={colors.textMuted}
               value={confirmPin}
               onChangeText={setConfirmPin}
               secureTextEntry
@@ -99,12 +134,21 @@ export const ChangePinModal: React.FC<ChangePinModalProps> = ({
             />
           </View>
 
-          <View style={styles.footer}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-              <Text style={styles.cancelBtnText}>Cancelar</Text>
+          <View style={[styles.footer, { borderTopColor: colors.borderSubtle }]}>
+            <TouchableOpacity
+              style={[styles.cancelBtn, { backgroundColor: colors.bgSurface }]}
+              onPress={onClose}
+            >
+              <Text style={[styles.cancelBtnText, { color: colors.textSecondary }]}>Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.submitBtn}
+              style={[
+                styles.submitBtn,
+                {
+                  backgroundColor: colors.primary,
+                  shadowColor: colors.primary,
+                },
+              ]}
               onPress={handleSubmit}
               disabled={loading}
             >

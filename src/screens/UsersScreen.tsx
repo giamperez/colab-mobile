@@ -7,8 +7,8 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
-  Alert,
   TextInput,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -16,306 +16,449 @@ import { usersApi } from '../api/users.api';
 import { groupsApi } from '../api/groups.api';
 import { extractArray } from '../api/utils';
 import { BottomNavBar } from '../components/BottomNavBar';
+import { AppHeader } from '../components/AppHeader';
+import { useAuth } from '../context/AuthContext';
 import { UserModal } from '../components/UserModal';
+import { useTheme } from '../context/ThemeContext';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { User, Group } from '../types';
+
+const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
+  SUPERADMIN: { bg: '#DC262625', text: '#DC2626' },
+  ADMIN: { bg: '#FF9E6D25', text: '#FF9E6D' },
+  JEFE: { bg: '#7C83FF25', text: '#7C83FF' },
+  USUARIO: { bg: '#5EE0C025', text: '#5EE0C0' },
+  COLABORADOR: { bg: '#5EE0C025', text: '#5EE0C0' },
+};
 
 export const UsersScreen = () => {
   const queryClient = useQueryClient();
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const { colors, isDark } = useTheme();
+  const { user: currentUser, isSuperAdmin, canManageUsers } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
+  const [userModalVisible, setUserModalVisible] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
 
   const { data: rawUsers, isLoading, refetch } = useQuery({
-    queryKey: ['users-management'],
+    queryKey: ['users-list-screen'],
     queryFn: () => usersApi.getAll().then((res) => res.data),
   });
 
   const { data: rawGroups } = useQuery({
-    queryKey: ['groups-list'],
+    queryKey: ['groups-list-screen-users'],
     queryFn: () => groupsApi.getAll().then((res) => res.data),
   });
 
   const users: User[] = extractArray<User>(rawUsers);
   const groups: Group[] = extractArray<Group>(rawGroups);
 
-  const createMutation = useMutation({
-    mutationFn: (dto: any) => usersApi.create(dto),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users-management'] }),
+  const createUserMutation = useMutation({
+    mutationFn: (data: any) => usersApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-list-screen'] });
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+    },
   });
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, dto }: { id: number; dto: any }) => usersApi.update(id, dto),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users-management'] }),
+  const updateUserMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => usersApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-list-screen'] });
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+    },
   });
 
-  const deleteMutation = useMutation({
+  const deleteUserMutation = useMutation({
     mutationFn: (id: number) => usersApi.remove(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users-management'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-list-screen'] });
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+    },
   });
 
-  const handleOpenCreate = () => {
-    setEditingUser(null);
-    setModalVisible(true);
-  };
+  const filteredUsers = (users || []).filter((u) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const nameMatch = (u.nombre || u.name || '').toLowerCase().includes(q);
+    const emailMatch = (u.email || '').toLowerCase().includes(q);
+    const dniMatch = (u.dni || '').toLowerCase().includes(q);
+    return nameMatch || emailMatch || dniMatch;
+  });
 
-  const handleOpenEdit = (user: User) => {
+  const handleEditUser = (user: User) => {
     setEditingUser(user);
-    setModalVisible(true);
+    setUserModalVisible(true);
   };
 
-  const handleSaveUser = async (data: any) => {
-    if (editingUser) {
-      await updateMutation.mutateAsync({ id: editingUser.id, dto: data });
-    } else {
-      await createMutation.mutateAsync(data);
-    }
-  };
-
-  const handleDeleteUser = (user: User) => {
+  const handleDeleteUserPrompt = (user: User) => {
     Alert.alert(
       'Eliminar Usuario',
-      `¿Deseas eliminar al usuario "${user.name}"?`,
+      `¿Deseas eliminar a ${user.nombre || user.name}?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Eliminar',
           style: 'destructive',
-          onPress: () => deleteMutation.mutate(user.id),
+          onPress: () => deleteUserMutation.mutate(user.id),
         },
       ]
     );
   };
 
-  const filteredUsers = users.filter((u: User) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      u.name.toLowerCase().includes(q) ||
-      u.dni.toLowerCase().includes(q) ||
-      (u.group_name && u.group_name.toLowerCase().includes(q))
-    );
-  });
-
   return (
-    <View style={styles.flexContainer}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Gestión de Usuarios ({users.length})</Text>
-          <TouchableOpacity style={styles.addBtn} onPress={handleOpenCreate}>
-            <Ionicons name="add" size={22} color="#FFFFFF" />
-            <Text style={styles.addBtnText}>Nuevo Usuario</Text>
-          </TouchableOpacity>
-        </View>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bgPrimary }]} edges={['top']}>
+      <AppHeader
+        title="Equipo & Usuarios"
+        subtitle="Gestión de colaboradores, roles y accesos"
+        onQuickAdd={() => {
+          setEditingUser(null);
+          setUserModalVisible(true);
+        }}
+      />
 
-        {/* Buscador */}
-        <View style={styles.searchWrapper}>
-          <Ionicons name="search-outline" size={18} color="#94A3B8" style={{ marginRight: 8 }} />
+      <View
+        style={[
+          styles.searchSection,
+          {
+            backgroundColor: colors.bgSecondary,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.searchBox,
+            {
+              backgroundColor: colors.bgSurface,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Ionicons name="search-outline" size={16} color={colors.textMuted} />
           <TextInput
-            style={styles.searchInput}
-            placeholder="Buscar por nombre, DNI o grupo..."
+            style={[styles.searchInput, { color: colors.textPrimary }]}
+            placeholder="Buscar por nombre, email o DNI..."
+            placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+          ) : null}
         </View>
 
-        {isLoading ? (
-          <ActivityIndicator size="large" color="#009497" style={{ marginTop: 40 }} />
-        ) : (
-          <FlatList
-            data={filteredUsers}
-            keyExtractor={(item) => item.id.toString()}
-            refreshControl={
-              <RefreshControl refreshing={isLoading} onRefresh={refetch} />
-            }
-            contentContainerStyle={styles.listContent}
-            renderItem={({ item }) => (
-              <View style={styles.card}>
-                <View style={styles.avatarBox}>
-                  <Text style={styles.avatarText}>{item.emoji || '👤'}</Text>
+        <TouchableOpacity
+          style={[styles.inviteBtn, { backgroundColor: colors.primary }]}
+          onPress={() => {
+            setEditingUser(null);
+            setUserModalVisible(true);
+          }}
+        >
+          <Ionicons name="person-add-outline" size={15} color="#FFFFFF" />
+          <Text style={styles.inviteBtnText}>Nuevo</Text>
+        </TouchableOpacity>
+      </View>
+
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Cargando colaboradores...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredUsers}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.listContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading}
+              onRefresh={refetch}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <View style={[styles.emptyIconCircle, { backgroundColor: colors.bgSecondary }]}>
+                <Ionicons name="people-outline" size={40} color={colors.textMuted} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No se encontraron usuarios</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+                {searchQuery
+                  ? 'Prueba con otro término de búsqueda.'
+                  : 'Crea tu primer usuario para empezar a colaborar.'}
+              </Text>
+            </View>
+          }
+          renderItem={({ item }) => {
+            const roleKey = (item.role || item.rol || 'USUARIO').toUpperCase();
+            const roleStyle = ROLE_COLORS[roleKey] || ROLE_COLORS.USUARIO;
+            const initials = (item.nombre || item.name || 'U')
+              .split(' ')
+              .map((n) => n[0])
+              .slice(0, 2)
+              .join('')
+              .toUpperCase();
+
+            const isItemSuperAdmin = roleKey === 'SUPERADMIN';
+            const isItemAdmin = roleKey === 'ADMIN';
+            const canEditItem = isSuperAdmin || (canManageUsers && !isItemSuperAdmin && !isItemAdmin) || item.id === currentUser?.id;
+            const canDeleteItem = isSuperAdmin ? item.id !== currentUser?.id : (canManageUsers && !isItemSuperAdmin && !isItemAdmin && item.id !== currentUser?.id);
+
+            return (
+              <View
+                style={[
+                  styles.userCard,
+                  {
+                    backgroundColor: colors.bgSecondary,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.userAvatar,
+                    {
+                      backgroundColor: colors.primaryMuted,
+                      borderColor: colors.primary,
+                      borderWidth: 1,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.userAvatarText, { color: colors.primary }]}>{item.emoji || initials}</Text>
                 </View>
 
                 <View style={styles.userInfo}>
-                  <Text style={styles.userName}>{item.name}</Text>
-                  <Text style={styles.userDni}>DNI: {item.dni}</Text>
+                  <Text style={[styles.userName, { color: colors.textPrimary }]}>{item.nombre || item.name}</Text>
+                  <Text style={[styles.userEmail, { color: colors.textSecondary }]}>
+                    {item.email || (item.dni ? `DNI: ${item.dni}` : 'Sin email')}
+                  </Text>
 
-                  <View style={styles.tagRow}>
-                    <View style={styles.roleBadge}>
-                      <Text style={styles.roleBadgeText}>
-                        {item.role ? item.role.toUpperCase() : 'USUARIO'}
+                  <View style={styles.userBadgesRow}>
+                    <View style={[styles.roleBadge, { backgroundColor: roleStyle.bg }]}>
+                      <Text style={[styles.roleBadgeText, { color: roleStyle.text }]}>
+                        {roleKey}
                       </Text>
                     </View>
-                    {item.group_name && (
-                      <View style={styles.groupBadge}>
-                        <Text style={styles.groupBadgeText}>{item.group_name}</Text>
+
+                    {item.group_name || (item as any).group?.name ? (
+                      <View style={[styles.statusBadge, { backgroundColor: colors.primaryMuted }]}>
+                        <Text style={[styles.statusBadgeText, { color: colors.primary }]}>
+                          {item.group_name || (item as any).group?.name}
+                        </Text>
                       </View>
-                    )}
+                    ) : null}
+
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        {
+                          backgroundColor:
+                            item.isActive !== false ? colors.mintMuted : colors.dangerMuted,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.statusBadgeText,
+                          {
+                            color: item.isActive !== false ? colors.mint : colors.danger,
+                          },
+                        ]}
+                      >
+                        {item.isActive !== false ? 'Activo' : 'Inactivo'}
+                      </Text>
+                    </View>
                   </View>
                 </View>
 
-                <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={styles.iconBtn}
-                    onPress={() => handleOpenEdit(item)}
-                  >
-                    <Ionicons name="create-outline" size={18} color="#009497" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.iconBtn}
-                    onPress={() => handleDeleteUser(item)}
-                  >
-                    <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
+                {(canEditItem || canDeleteItem) && (
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    {canEditItem && (
+                      <TouchableOpacity
+                        style={[styles.deleteUserBtn, { backgroundColor: colors.primaryMuted }]}
+                        onPress={() => handleEditUser(item)}
+                      >
+                        <Ionicons name="pencil-outline" size={16} color={colors.primary} />
+                      </TouchableOpacity>
+                    )}
+                    {canDeleteItem && (
+                      <TouchableOpacity
+                        style={[styles.deleteUserBtn, { backgroundColor: colors.dangerMuted }]}
+                        onPress={() => handleDeleteUserPrompt(item)}
+                      >
+                        <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
               </View>
-            )}
-          />
-        )}
-      </View>
-
-      <UserModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        onSubmit={handleSaveUser}
-        initialUser={editingUser}
-        groups={groups}
-      />
+            );
+          }}
+        />
+      )}
 
       <BottomNavBar />
-    </View>
+
+      <UserModal
+        visible={userModalVisible}
+        onClose={() => {
+          setUserModalVisible(false);
+          setEditingUser(null);
+        }}
+        initialUser={editingUser}
+        groups={groups}
+        onSubmit={async (userData) => {
+          if (editingUser) {
+            await updateUserMutation.mutateAsync({ id: editingUser.id, data: userData });
+          } else {
+            await createUserMutation.mutateAsync(userData);
+          }
+        }}
+      />
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  flexContainer: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
   container: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 50,
   },
-  header: {
+  searchSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#0F172A',
-  },
-  addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#009497',
-    paddingHorizontal: 14,
+    gap: 10,
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 14,
-    gap: 4,
+    borderBottomWidth: 1,
   },
-  addBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  searchWrapper: {
+  searchBox: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
     borderRadius: 14,
+    borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    marginBottom: 14,
+    gap: 8,
   },
   searchInput: {
     flex: 1,
     fontSize: 13,
-    color: '#0F172A',
   },
-  listContent: {
-    paddingBottom: 30,
-  },
-  card: {
+  inviteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
   },
-  avatarBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#E2F5F3',
+  inviteBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 13,
+  },
+  listContainer: {
+    padding: 16,
+    gap: 12,
+  },
+  emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
+    paddingVertical: 60,
   },
-  avatarText: {
-    fontSize: 22,
+  emptyIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  emptySubtitle: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
+    maxWidth: 240,
+  },
+  userCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    gap: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+  },
+  userAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userAvatarText: {
+    fontSize: 18,
+    fontWeight: '800',
   },
   userInfo: {
     flex: 1,
   },
   userName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
-    color: '#0F172A',
   },
-  userDni: {
+  userEmail: {
     fontSize: 12,
-    color: '#64748B',
     marginTop: 2,
   },
-  tagRow: {
+  userBadgesRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 6,
-    gap: 6,
+    gap: 8,
+    marginTop: 8,
   },
   roleBadge: {
-    backgroundColor: '#EEF2FF',
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
   roleBadgeText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#534AB7',
   },
-  groupBadge: {
-    backgroundColor: '#F1F5F9',
+  statusBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
-  groupBadgeText: {
+  statusBadgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#475569',
   },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  iconBtn: {
-    width: 34,
-    height: 34,
+  deleteUserBtn: {
+    padding: 8,
     borderRadius: 10,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
 

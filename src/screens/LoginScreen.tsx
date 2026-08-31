@@ -13,33 +13,47 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { useNotification } from '../context/NotificationContext';
+import { useNavigation } from '@react-navigation/native';
 
 export const LoginScreen = () => {
   const { login } = useAuth();
-  const [email, setEmail] = useState('');
+  const { colors, isDark } = useTheme();
+  const { showError, showWarning } = useNotification();
+  const navigation = useNavigation<any>();
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email.trim()) {
-      Alert.alert('Correo Requerido', 'Por favor ingresa tu correo electrónico.');
+    const trimmedId = identifier.trim();
+    const trimmedPass = password.trim();
+
+    if (!trimmedId) {
+      showWarning('Acceso Requerido', 'Por favor ingresa tu correo electrónico o DNI.');
       return;
     }
-    if (!password.trim()) {
-      Alert.alert('Contraseña Requerida', 'Por favor ingresa tu contraseña de acceso.');
+    if (!trimmedPass) {
+      showWarning('Clave Requerida', 'Por favor ingresa tu contraseña o PIN de acceso.');
       return;
     }
 
     setLoading(true);
     try {
-      await login({ email: email.trim(), password: password.trim() });
+      await login({
+        email: trimmedId.toLowerCase(),
+        dni: trimmedId,
+        password: trimmedPass,
+        pin: trimmedPass,
+      });
     } catch (error: any) {
       const serverMsg = error.response?.data?.message;
       const displayMsg = Array.isArray(serverMsg)
         ? serverMsg.join('\n')
-        : serverMsg || 'Correo o contraseña incorrectos';
-      Alert.alert('Error de Autenticación', displayMsg);
+        : serverMsg || 'Correo / DNI o contraseña / PIN incorrectos';
+      showError('Error de Autenticación', displayMsg);
     } finally {
       setLoading(false);
     }
@@ -48,46 +62,77 @@ export const LoginScreen = () => {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.flexContainer}
+      style={[styles.flexContainer, { backgroundColor: colors.bgPrimary }]}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         {/* Encabezado */}
         <View style={styles.brandBox}>
-          <View style={styles.iconCircle}>
-            <Ionicons name="apps-outline" size={36} color="#009497" />
+          <View
+            style={[
+              styles.iconCircle,
+              {
+                backgroundColor: colors.primary,
+                shadowColor: colors.primary,
+              },
+            ]}
+          >
+            <Ionicons name="sparkles" size={32} color="#FFFFFF" />
           </View>
-          <Text style={styles.brandTitle}>Pyramid COLAB</Text>
-          <Text style={styles.brandSubtitle}>
-            Gestión corporativa de objetivos y proyectos
+          <Text style={[styles.brandTitle, { color: colors.textPrimary }]}>ComoVamos Mobile</Text>
+          <Text style={[styles.brandSubtitle, { color: colors.textSecondary }]}>
+            Gestión corporativa de objetivos, proyectos y equipos
           </Text>
         </View>
 
         {/* Formulario */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Iniciar Sesión</Text>
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: colors.bgSecondary,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Iniciar Sesión</Text>
 
-          <Text style={styles.label}>EMAIL DE ACCESO</Text>
-          <View style={styles.inputWrapper}>
-            <Ionicons name="mail-outline" size={20} color="#64748B" style={styles.inputIcon} />
+          <Text style={[styles.label, { color: colors.textSecondary }]}>CORREO ELECTRÓNICO O DNI</Text>
+          <View
+            style={[
+              styles.inputWrapper,
+              {
+                backgroundColor: colors.bgSurface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <Ionicons name="person-outline" size={18} color={colors.textMuted} style={styles.inputIcon} />
             <TextInput
-              style={styles.input}
-              placeholder="usuario@empresa.com"
-              placeholderTextColor="#94A3B8"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
+              style={[styles.input, { color: colors.textPrimary }]}
+              placeholder="usuario@empresa.com o 70123456"
+              placeholderTextColor={colors.textMuted}
+              value={identifier}
+              onChangeText={setIdentifier}
               autoCapitalize="none"
               autoCorrect={false}
             />
           </View>
 
-          <Text style={styles.label}>CLAVE DE ACCESO</Text>
-          <View style={styles.inputWrapper}>
-            <Ionicons name="lock-closed-outline" size={20} color="#64748B" style={styles.inputIcon} />
+          <Text style={[styles.label, { color: colors.textSecondary }]}>CONTRASEÑA O PIN</Text>
+          <View
+            style={[
+              styles.inputWrapper,
+              {
+                backgroundColor: colors.bgSurface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <Ionicons name="lock-closed-outline" size={18} color={colors.textMuted} style={styles.inputIcon} />
             <TextInput
-              style={styles.input}
-              placeholder="Tu contraseña"
-              placeholderTextColor="#94A3B8"
+              style={[styles.input, { color: colors.textPrimary }]}
+              placeholder="Tu contraseña o PIN"
+              placeholderTextColor={colors.textMuted}
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
@@ -96,14 +141,21 @@ export const LoginScreen = () => {
             <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
               <Ionicons
                 name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                size={20}
-                color="#64748B"
+                size={18}
+                color={colors.textMuted}
               />
             </TouchableOpacity>
           </View>
 
           <TouchableOpacity
-            style={[styles.loginBtn, loading && { opacity: 0.7 }]}
+            style={[
+              styles.loginBtn,
+              {
+                backgroundColor: colors.primary,
+                shadowColor: colors.primary,
+              },
+              loading && { opacity: 0.7 },
+            ]}
             onPress={handleLogin}
             disabled={loading}
             activeOpacity={0.8}
@@ -114,6 +166,18 @@ export const LoginScreen = () => {
               <Text style={styles.loginBtnText}>INGRESAR AL SISTEMA</Text>
             )}
           </TouchableOpacity>
+
+          {/* Enlace a Registro */}
+          <View style={styles.registerBox}>
+            <Text style={[styles.registerPrompt, { color: colors.textSecondary }]}>
+              ¿No tienes una cuenta aún?
+            </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+              <Text style={[styles.registerLink, { color: colors.primary }]}>
+                Registrar mi Empresa
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -123,7 +187,6 @@ export const LoginScreen = () => {
 const styles = StyleSheet.create({
   flexContainer: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
   },
   container: {
     flexGrow: 1,
@@ -132,52 +195,50 @@ const styles = StyleSheet.create({
   },
   brandBox: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 28,
   },
   iconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#E2F5F3',
+    width: 64,
+    height: 64,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
+    elevation: 6,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
   },
   brandTitle: {
     fontSize: 28,
     fontWeight: '900',
-    color: '#0F172A',
     letterSpacing: -0.5,
   },
   brandSubtitle: {
     fontSize: 13,
-    color: '#64748B',
     textAlign: 'center',
     marginTop: 6,
     maxWidth: '85%',
+    lineHeight: 18,
   },
   card: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 24,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.08,
     shadowRadius: 16,
   },
   cardTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 20,
+    marginBottom: 18,
   },
   label: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#64748B',
     letterSpacing: 0.5,
     marginBottom: 6,
     marginTop: 12,
@@ -185,10 +246,8 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 16,
+    borderRadius: 14,
     paddingHorizontal: 14,
   },
   inputIcon: {
@@ -196,24 +255,22 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 13,
     fontSize: 15,
-    color: '#0F172A',
     fontWeight: '600',
   },
   eyeBtn: {
     padding: 6,
   },
   loginBtn: {
-    backgroundColor: '#009497',
     paddingVertical: 16,
-    borderRadius: 16,
+    borderRadius: 14,
     alignItems: 'center',
     marginTop: 24,
     elevation: 3,
-    shadowColor: '#009497',
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.35,
     shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
   },
   loginBtnText: {
     color: '#FFFFFF',
@@ -221,6 +278,20 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.5,
   },
+  registerBox: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    marginTop: 20,
+    gap: 4,
+  },
+  registerPrompt: {
+    fontSize: 13,
+  },
+  registerLink: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
 });
 
 export default LoginScreen;
+

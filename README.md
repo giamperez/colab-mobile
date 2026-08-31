@@ -1,6 +1,6 @@
-﻿# ComoVamos - Mobile App
+# Colab Mobile
 
-Aplicación móvil desarrollada con **React Native** y **Expo** para la plataforma ComoVamos.
+Aplicación móvil desarrollada con **React Native** y **Expo** para la plataforma Colab.
 
 ## 🚀 Requisitos previos
 

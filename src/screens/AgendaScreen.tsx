@@ -3,9 +3,9 @@ import {
   View,
   Text,
   StyleSheet,
+  TextInput,
   TouchableOpacity,
   ScrollView,
-  TextInput,
   ActivityIndicator,
   Alert,
 } from 'react-native';
@@ -13,283 +13,444 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { agendaApi } from '../api/agenda.api';
 import { BottomNavBar } from '../components/BottomNavBar';
+import { AppHeader } from '../components/AppHeader';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext';
+import { useNavigation } from '@react-navigation/native';
+import { PRIORITY_LABELS, PRIORITY_COLORS } from '../types';
+import type { Task } from '../types';
+
+const SOURCE_OPTIONS = [
+  { id: 'api', label: '📱 Móvil / API' },
+  { id: 'whatsapp', label: '💬 WhatsApp' },
+  { id: 'web', label: '💻 Web' },
+  { id: 'telegram', label: '👥 Telegram' },
+];
 
 export const AgendaScreen = () => {
+  const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
-  const [meetingNotes, setMeetingNotes] = useState('');
-  const [channel, setChannel] = useState<'comovamos' | 'desarrolladores' | 'general'>('comovamos');
-  const [resultData, setResultData] = useState<any>(null);
+  const { colors, isDark } = useTheme();
+  const [rawText, setRawText] = useState('');
+  const [source, setSource] = useState('api');
+  const [executionDate, setExecutionDate] = useState(
+    new Date().toISOString().split('T')[0]
+  );
+  const [result, setResult] = useState<{ tasks_created: number; tasks?: Task[] } | null>(null);
 
   const processMutation = useMutation({
     mutationFn: (dto: any) => agendaApi.process(dto).then((res) => res.data),
-    onSuccess: (data: any) => {
-      setResultData(data);
-      queryClient.invalidateQueries({ queryKey: ['all-tasks-dashboard'] });
+    onSuccess: (data) => {
+      setResult(data);
+      Alert.alert(
+        '¡Agenda Procesada!',
+        `Se han estructurado y creado ${data.tasks_created || 0} tareas automáticamente.`
+      );
+      setRawText('');
       queryClient.invalidateQueries({ queryKey: ['tasks-kanban'] });
-      Alert.alert('¡Éxito!', 'Notas procesadas y tareas creadas automáticamente.');
+      queryClient.invalidateQueries({ queryKey: ['tasks-dashboard-all'] });
     },
-    onError: (error: any) => {
-      Alert.alert('Error', error.response?.data?.message || 'Falló el procesamiento de la agenda con IA.');
+    onError: (err: any) => {
+      Alert.alert(
+        'Error al procesar',
+        err.response?.data?.message || 'No se pudo procesar la agenda.'
+      );
     },
   });
 
-  const handleProcessAgenda = () => {
-    if (!meetingNotes.trim()) {
-      Alert.alert('Atención', 'Ingresa las notas de la reunión antes de procesar.');
+  const handleProcess = () => {
+    if (!rawText.trim()) {
+      Alert.alert('Texto Requerido', 'Por favor ingresa o pega el texto de la agenda o minuta.');
       return;
     }
     processMutation.mutate({
-      rawText: meetingNotes,
-      channel,
+      raw_text: rawText.trim(),
+      source,
+      execution_date: executionDate,
     });
   };
 
   return (
-    <View style={styles.flexContainer}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.aiBadge}>
-            <Ionicons name="flash-outline" size={14} color="#D85A30" />
-            <Text style={styles.aiBadgeText}>IA ASSISTANT</Text>
-          </View>
-          <Text style={styles.title}>Agenda Inteligente</Text>
-          <Text style={styles.subtitle}>
-            Pega las minutas o notas de tu reunión. La IA identificará compromisos, asignados y fechas automáticamente.
-          </Text>
-        </View>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bgPrimary }]} edges={['top']}>
+      <AppHeader
+        title="Bitácora & Agenda"
+        subtitle="Transforma notas y minutas en tareas estructuradas con IA"
+      />
 
-        {/* Selector de Canal */}
-        <Text style={styles.label}>Canal o Proyecto Destino</Text>
-        <View style={styles.channelRow}>
-          {[
-            { id: 'comovamos', label: 'Cómo Vamos' },
-            { id: 'desarrolladores', label: 'Dev Team' },
-            { id: 'general', label: 'General' },
-          ].map((c) => (
-            <TouchableOpacity
-              key={c.id}
-              style={[
-                styles.channelPill,
-                channel === c.id && styles.channelPillActive,
-              ]}
-              onPress={() => setChannel(c.id as any)}
-            >
-              <Text
-                style={[
-                  styles.channelPillText,
-                  channel === c.id && styles.channelPillTextActive,
-                ]}
-              >
-                {c.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Input de Notas */}
-        <Text style={styles.label}>Minuta / Transcripción de Reunión</Text>
-        <TextInput
-          style={styles.textArea}
-          multiline
-          numberOfLines={8}
-          placeholder="Ej: En la reunión acordamos que Juan diseñará el prototipo para el viernes y María configurará los servidores el lunes..."
-          placeholderTextColor="#94A3B8"
-          value={meetingNotes}
-          onChangeText={setMeetingNotes}
-          textAlignVertical="top"
-        />
-
-        {/* Botón de Procesar */}
-        <TouchableOpacity
-          style={[styles.processBtn, processMutation.isPending && { opacity: 0.7 }]}
-          onPress={handleProcessAgenda}
-          disabled={processMutation.isPending}
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        {/* Intro Card */}
+        <View
+          style={[
+            styles.introCard,
+            {
+              backgroundColor: colors.primaryMuted,
+              borderColor: colors.borderSubtle,
+            },
+          ]}
         >
-          {processMutation.isPending ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <>
-              <Ionicons name="flash-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.processBtnText}>Procesar Notas con IA</Text>
-            </>
-          )}
-        </TouchableOpacity>
-
-        {/* Resultado Procesado */}
-        {resultData && (
-          <View style={styles.resultBox}>
-            <View style={styles.resultHeader}>
-              <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-              <Text style={styles.resultTitle}>Resumen de la Reunión</Text>
-            </View>
-            <Text style={styles.resultSummary}>
-              {resultData.summary || resultData.message || 'Notas procesadas con éxito.'}
+          <View style={[styles.introIconCircle, { backgroundColor: colors.bgSurface }]}>
+            <Ionicons name="sparkles" size={24} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.introTitle, { color: colors.textPrimary }]}>Extracción Inteligente</Text>
+            <Text style={[styles.introDesc, { color: colors.primary }]}>
+              Pega apuntes de reuniones o mensajes. El sistema detectará responsables,
+              prioridades y creará las tareas.
             </Text>
+          </View>
+        </View>
 
-            {resultData.createdTasks && resultData.createdTasks.length > 0 && (
-              <View style={{ marginTop: 12 }}>
-                <Text style={styles.tasksCreatedTitle}>
-                  Tareas Generadas ({resultData.createdTasks.length})
+        {/* Input Form */}
+        <View
+          style={[
+            styles.formCard,
+            {
+              backgroundColor: colors.bgSecondary,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Text style={[styles.label, { color: colors.textSecondary }]}>NOTAS / MINUTA DE REUNIÓN *</Text>
+          <TextInput
+            style={[
+              styles.textArea,
+              {
+                backgroundColor: colors.bgSurface,
+                borderColor: colors.border,
+                color: colors.textPrimary,
+              },
+            ]}
+            placeholder={`Ejemplo:\n- Carlos debe enviar la cotización para el cliente Acero antes de las 5pm.\n- María actualizará el cronograma de la campaña en Gantt.\n- Revisar el estado de los pagos pendientes.`}
+            placeholderTextColor={colors.textMuted}
+            value={rawText}
+            onChangeText={setRawText}
+            multiline
+            numberOfLines={6}
+            textAlignVertical="top"
+          />
+
+          <View style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>FECHA DE EJECUCIÓN</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.bgSurface,
+                    borderColor: colors.border,
+                    color: colors.textPrimary,
+                  },
+                ]}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors.textMuted}
+                value={executionDate}
+                onChangeText={setExecutionDate}
+              />
+            </View>
+          </View>
+
+          <Text style={[styles.label, { color: colors.textSecondary }]}>ORIGEN DE LA INFORMACIÓN</Text>
+          <View style={styles.sourceGrid}>
+            {SOURCE_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.id}
+                style={[
+                  styles.sourcePill,
+                  {
+                    backgroundColor: colors.bgSurface,
+                    borderColor: colors.border,
+                  },
+                  source === opt.id && {
+                    backgroundColor: colors.primary,
+                    borderColor: colors.primary,
+                  },
+                ]}
+                onPress={() => setSource(opt.id)}
+              >
+                <Text
+                  style={[
+                    styles.sourcePillText,
+                    { color: colors.textSecondary },
+                    source === opt.id && styles.sourcePillTextActive,
+                  ]}
+                >
+                  {opt.label}
                 </Text>
-                {resultData.createdTasks.map((t: any, idx: number) => (
-                  <View key={idx} style={styles.taskItemResult}>
-                    <Ionicons name="checkbox-outline" size={16} color="#009497" />
-                    <Text style={styles.taskItemText}>{t.title || t}</Text>
-                  </View>
-                ))}
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.processBtn,
+              {
+                backgroundColor: colors.primary,
+                shadowColor: colors.primary,
+              },
+              processMutation.isPending && { opacity: 0.7 },
+            ]}
+            onPress={handleProcess}
+            disabled={processMutation.isPending}
+          >
+            {processMutation.isPending ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <View style={styles.btnContent}>
+                <Ionicons name="flash-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.processBtnText}>PROCESAR Y CREAR TAREAS</Text>
               </View>
             )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Results Box */}
+        {result && (
+          <View
+            style={[
+              styles.resultCard,
+              {
+                backgroundColor: colors.bgSecondary,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <View style={styles.resultHeader}>
+              <Ionicons name="checkmark-circle" size={22} color={colors.mint} />
+              <Text style={[styles.resultTitle, { color: colors.mint }]}>
+                ¡Se crearon {result.tasks_created} tareas con éxito!
+              </Text>
+            </View>
+            <Text style={[styles.resultSubtitle, { color: colors.textSecondary }]}>
+              DeepSeek extrajo las tareas asignadas por responsable y fechas de ejecución.
+            </Text>
+
+            {result.tasks && result.tasks.length > 0 && (
+              <View style={{ marginTop: 12, gap: 8 }}>
+                {result.tasks.map((task: any, idx: number) => {
+                  const pCol = PRIORITY_COLORS[task.priority as keyof typeof PRIORITY_COLORS] || colors.primary;
+                  return (
+                    <View
+                      key={idx}
+                      style={{
+                        backgroundColor: colors.bgSurface,
+                        borderColor: colors.border,
+                        borderWidth: 1,
+                        borderRadius: 12,
+                        padding: 12,
+                        gap: 6,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 13, fontWeight: '800', color: colors.textPrimary, flex: 1 }}>
+                          {task.title}
+                        </Text>
+                        <View style={{ backgroundColor: pCol + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: pCol, textTransform: 'uppercase' }}>
+                            {PRIORITY_LABELS[task.priority as keyof typeof PRIORITY_LABELS] || task.priority}
+                          </Text>
+                        </View>
+                      </View>
+                      {task.description ? (
+                        <Text style={{ fontSize: 12, color: colors.textSecondary }} numberOfLines={2}>
+                          {task.description}
+                        </Text>
+                      ) : null}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={{ fontSize: 14 }}>{task.assignee?.emoji || '👤'}</Text>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
+                            {task.assignee?.name || task.assignee?.nombre || 'Sin asignar'}
+                          </Text>
+                        </View>
+                        {task.execution_date && (
+                          <Text style={{ fontSize: 10, color: colors.textMuted, fontWeight: '600' }}>
+                            📅 {String(task.execution_date).split('T')[0]}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={{
+                marginTop: 16,
+                backgroundColor: colors.primary,
+                paddingVertical: 12,
+                borderRadius: 12,
+                alignItems: 'center',
+                flexDirection: 'row',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+              onPress={() => navigation.navigate('Kanban')}
+            >
+              <Ionicons name="grid-outline" size={16} color="#FFFFFF" />
+              <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>IR AL TABLERO KANBAN</Text>
+            </TouchableOpacity>
           </View>
         )}
 
-        <View style={{ height: 40 }} />
+        <View style={{ height: 30 }} />
       </ScrollView>
 
       <BottomNavBar />
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  flexContainer: {
+  container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  container: {
-    paddingHorizontal: 20,
-    paddingTop: 50,
+  scroll: {
+    flex: 1,
   },
-  header: {
-    marginBottom: 20,
+  content: {
+    padding: 16,
+    gap: 16,
   },
-  aiBadge: {
+  introCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF3ED',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-    marginBottom: 8,
-    gap: 4,
+    gap: 14,
+    backgroundColor: '#E6F6F6',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#CCFBF1',
   },
-  aiBadgeText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#D85A30',
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#0F172A',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: '#64748B',
-    lineHeight: 18,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#334155',
-    marginBottom: 8,
-    marginTop: 12,
-  },
-  channelRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-  },
-  channelPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
+  introIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  introTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  introDesc: {
+    fontSize: 12,
+    color: '#007072',
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  formCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  channelPillActive: {
-    backgroundColor: '#D85A30',
-    borderColor: '#D85A30',
-  },
-  channelPillText: {
-    fontSize: 12,
-    fontWeight: '700',
+  label: {
+    fontSize: 11,
+    fontWeight: '800',
     color: '#64748B',
-  },
-  channelPillTextActive: {
-    color: '#FFFFFF',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+    marginTop: 10,
   },
   textArea: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 16,
     padding: 14,
-    fontSize: 14,
+    fontSize: 13,
     color: '#0F172A',
-    minHeight: 160,
-    marginBottom: 16,
+    minHeight: 130,
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  input: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: '#0F172A',
+  },
+  sourceGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  sourcePill: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  sourcePillActive: {
+    backgroundColor: '#009497',
+    borderColor: '#009497',
+  },
+  sourcePillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  sourcePillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
   processBtn: {
+    backgroundColor: '#009497',
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginTop: 24,
+    elevation: 3,
+    shadowColor: '#009497',
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+  },
+  btnContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#D85A30',
-    borderRadius: 16,
-    paddingVertical: 14,
     gap: 8,
-    elevation: 3,
-    shadowColor: '#D85A30',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
   },
   processBtnText: {
     color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 15,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
-  resultBox: {
-    backgroundColor: '#FFFFFF',
+  resultCard: {
+    backgroundColor: '#ECFDF5',
     borderRadius: 20,
     padding: 18,
-    marginTop: 20,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#A7F3D0',
   },
   resultHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
+    gap: 8,
   },
   resultTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#065F46',
   },
-  resultSummary: {
-    fontSize: 13,
-    color: '#475569',
-    lineHeight: 18,
-  },
-  tasksCreatedTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#009497',
-    marginBottom: 6,
-  },
-  taskItemResult: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 4,
-  },
-  taskItemText: {
-    fontSize: 13,
-    color: '#334155',
-    fontWeight: '600',
+  resultSubtitle: {
+    fontSize: 12,
+    color: '#047857',
+    marginTop: 4,
   },
 });
 

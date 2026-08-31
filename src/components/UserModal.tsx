@@ -11,6 +11,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import type { User, Group } from '../types';
 
 interface UserModalProps {
@@ -28,10 +30,12 @@ export const UserModal: React.FC<UserModalProps> = ({
   initialUser,
   groups,
 }) => {
+  const { isSuperAdmin } = useAuth();
+  const { colors, isDark } = useTheme();
   const [name, setName] = useState('');
   const [dni, setDni] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'admin' | 'jefe' | 'usuario'>('usuario');
+  const [role, setRole] = useState<string>('usuario');
   const [groupId, setGroupId] = useState<number | null>(null);
   const [emoji, setEmoji] = useState('👤');
   const [whatsapp, setWhatsapp] = useState('');
@@ -41,10 +45,10 @@ export const UserModal: React.FC<UserModalProps> = ({
 
   useEffect(() => {
     if (initialUser) {
-      setName(initialUser.name || '');
+      setName(initialUser.name || initialUser.nombre || '');
       setDni(initialUser.dni || '');
       setEmail(initialUser.email || '');
-      setRole(initialUser.role || 'usuario');
+      setRole((initialUser.role || initialUser.rol || 'usuario').toLowerCase());
       setGroupId(initialUser.group_id || null);
       setEmoji(initialUser.emoji || '👤');
       setWhatsapp(initialUser.whatsapp || '');
@@ -92,26 +96,41 @@ export const UserModal: React.FC<UserModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.overlay}>
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>
+        <View
+          style={[
+            styles.container,
+            {
+              backgroundColor: colors.bgSecondary,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <View style={[styles.header, { borderBottomColor: colors.borderSubtle }]}>
+            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
               {initialUser ? 'Editar Usuario' : 'Nuevo Usuario'}
             </Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={24} color="#64748B" />
+              <Ionicons name="close" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
             {/* Emoji Selector */}
-            <Text style={styles.label}>Emoji / Avatar</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Emoji / Avatar</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.rowScroll}>
               {EMOJI_OPTIONS.map((e) => (
                 <TouchableOpacity
                   key={e}
                   style={[
                     styles.emojiItem,
-                    emoji === e && styles.emojiItemActive,
+                    {
+                      backgroundColor: colors.bgSurface,
+                      borderColor: colors.border,
+                    },
+                    emoji === e && {
+                      backgroundColor: colors.primaryMuted,
+                      borderColor: colors.primary,
+                    },
                   ]}
                   onPress={() => setEmoji(e)}
                 >
@@ -121,35 +140,59 @@ export const UserModal: React.FC<UserModalProps> = ({
             </ScrollView>
 
             {/* Nombre */}
-            <Text style={styles.label}>Nombre Completo *</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Nombre Completo *</Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.bgSurface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
               placeholder="Ej: Juan Pérez"
+              placeholderTextColor={colors.textMuted}
               value={name}
               onChangeText={setName}
             />
 
             {/* DNI */}
-            <Text style={styles.label}>DNI *</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>DNI *</Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.bgSurface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
               placeholder="Número de DNI"
+              placeholderTextColor={colors.textMuted}
               value={dni}
               onChangeText={setDni}
               keyboardType="number-pad"
             />
 
             {!initialUser && (
-              <Text style={styles.hint}>
+              <Text style={[styles.hint, { color: colors.textMuted }]}>
                 * El PIN inicial será los primeros 4 dígitos del DNI
               </Text>
             )}
 
             {/* Email */}
-            <Text style={styles.label}>Correo Electrónico</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Correo Electrónico</Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.bgSurface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
               placeholder="correo@ejemplo.com"
+              placeholderTextColor={colors.textMuted}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
@@ -157,16 +200,33 @@ export const UserModal: React.FC<UserModalProps> = ({
             />
 
             {/* Rol */}
-            <Text style={styles.label}>Rol de Usuario</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Rol de Usuario</Text>
             <View style={styles.rowWrap}>
-              {(['usuario', 'jefe', 'admin'] as const).map((r) => (
+              {(isSuperAdmin
+                ? (['usuario', 'jefe', 'admin', 'superadmin'] as const)
+                : (['usuario', 'jefe'] as const)
+              ).map((r) => (
                 <TouchableOpacity
                   key={r}
-                  style={[styles.rolePill, role === r && styles.rolePillActive]}
+                  style={[
+                    styles.rolePill,
+                    {
+                      backgroundColor: colors.bgSurface,
+                      borderColor: colors.border,
+                    },
+                    role === r && {
+                      backgroundColor: colors.primary,
+                      borderColor: colors.primary,
+                    },
+                  ]}
                   onPress={() => setRole(r)}
                 >
                   <Text
-                    style={[styles.roleText, role === r && styles.roleTextActive]}
+                    style={[
+                      styles.roleText,
+                      { color: colors.textSecondary },
+                      role === r && { color: '#FFFFFF', fontWeight: '800' },
+                    ]}
                   >
                     {r.toUpperCase()}
                   </Text>
@@ -175,19 +235,27 @@ export const UserModal: React.FC<UserModalProps> = ({
             </View>
 
             {/* Grupo */}
-            <Text style={styles.label}>Grupo / Área</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Grupo / Área</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.rowScroll}>
               <TouchableOpacity
                 style={[
                   styles.rolePill,
-                  groupId === null && styles.rolePillActive,
+                  {
+                    backgroundColor: colors.bgSurface,
+                    borderColor: colors.border,
+                  },
+                  groupId === null && {
+                    backgroundColor: colors.primary,
+                    borderColor: colors.primary,
+                  },
                 ]}
                 onPress={() => setGroupId(null)}
               >
                 <Text
                   style={[
                     styles.roleText,
-                    groupId === null && styles.roleTextActive,
+                    { color: colors.textSecondary },
+                    groupId === null && { color: '#FFFFFF', fontWeight: '800' },
                   ]}
                 >
                   Sin grupo
@@ -198,9 +266,13 @@ export const UserModal: React.FC<UserModalProps> = ({
                   key={g.id}
                   style={[
                     styles.rolePill,
+                    {
+                      backgroundColor: colors.bgSurface,
+                      borderColor: colors.border,
+                    },
                     groupId === g.id && {
-                      backgroundColor: g.color || '#009497',
-                      borderColor: g.color || '#009497',
+                      backgroundColor: g.color || colors.primary,
+                      borderColor: g.color || colors.primary,
                     },
                   ]}
                   onPress={() => setGroupId(g.id)}
@@ -208,7 +280,8 @@ export const UserModal: React.FC<UserModalProps> = ({
                   <Text
                     style={[
                       styles.roleText,
-                      groupId === g.id && styles.roleTextActive,
+                      { color: colors.textSecondary },
+                      groupId === g.id && { color: '#FFFFFF', fontWeight: '800' },
                     ]}
                   >
                     {g.name}
@@ -218,10 +291,18 @@ export const UserModal: React.FC<UserModalProps> = ({
             </ScrollView>
 
             {/* WhatsApp */}
-            <Text style={styles.label}>Número WhatsApp</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Número WhatsApp</Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.bgSurface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
               placeholder="Ej: +51999888777"
+              placeholderTextColor={colors.textMuted}
               value={whatsapp}
               onChangeText={setWhatsapp}
               keyboardType="phone-pad"
@@ -230,12 +311,21 @@ export const UserModal: React.FC<UserModalProps> = ({
             <View style={{ height: 20 }} />
           </ScrollView>
 
-          <View style={styles.footer}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-              <Text style={styles.cancelBtnText}>Cancelar</Text>
+          <View style={[styles.footer, { borderTopColor: colors.borderSubtle }]}>
+            <TouchableOpacity
+              style={[styles.cancelBtn, { backgroundColor: colors.bgSurface }]}
+              onPress={onClose}
+            >
+              <Text style={[styles.cancelBtnText, { color: colors.textSecondary }]}>Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.submitBtn}
+              style={[
+                styles.submitBtn,
+                {
+                  backgroundColor: colors.primary,
+                  shadowColor: colors.primary,
+                },
+              ]}
               onPress={handleSubmit}
               disabled={loading}
             >
