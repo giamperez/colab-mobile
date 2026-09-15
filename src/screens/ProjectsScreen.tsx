@@ -34,7 +34,7 @@ import {
   PriorityLevel,
 } from '../types';
 import type { GanttItem, Group, User, Category, Task } from '../types';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import dayjs from 'dayjs';
 
@@ -49,6 +49,7 @@ const TYPE_ICONS: Record<string, string> = {
 };
 
 export const ProjectsScreen = () => {
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { colors, isDark } = useTheme();
 
@@ -242,7 +243,10 @@ export const ProjectsScreen = () => {
         <FlatList
           data={items}
           keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={[
+            styles.listContainer,
+            { paddingBottom: Math.max(insets.bottom, 8) + 85 },
+          ]}
           refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={colors.primary} />}
           ListEmptyComponent={
             <View style={styles.emptyState}>
@@ -280,14 +284,18 @@ export const ProjectsScreen = () => {
             const iconName = TYPE_ICONS[item.type?.toLowerCase()] || 'layers-outline';
 
             return (
-              <View style={[styles.projectCard, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
-                <TouchableOpacity style={styles.cardMain} onPress={() => toggleProjectExpand(item.id)} activeOpacity={0.7}>
+              <View style={[styles.projectCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+                <TouchableOpacity style={styles.cardMain} onPress={() => toggleProjectExpand(item.id)} activeOpacity={0.75}>
+                  {/* Row 1: Type badge + Project Title + Actions */}
                   <View style={styles.cardHeader}>
-                    <View style={styles.typeRow}>
-                      <View style={[styles.typeBadge, { backgroundColor: projectColor + '20' }]}>
-                        <Ionicons name={iconName as any} size={13} color={projectColor} />
+                    <View style={styles.headerLeftCol}>
+                      <View style={[styles.typeBadge, { backgroundColor: projectColor + '18' }]}>
+                        <Ionicons name={iconName as any} size={11} color={projectColor} />
                         <Text style={[styles.typeText, { color: projectColor }]}>{item.type || 'Plan'}</Text>
                       </View>
+                      <Text style={[styles.projectTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                        {item.title || item.nombre || 'Plan de Trabajo'}
+                      </Text>
                     </View>
 
                     <View style={styles.headerActions}>
@@ -297,59 +305,76 @@ export const ProjectsScreen = () => {
                           setEditingItem(item);
                           setModalVisible(true);
                         }}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                       >
-                        <Ionicons name="pencil-outline" size={15} color={colors.textSecondary} />
+                        <Ionicons name="pencil-outline" size={13} color={colors.textSecondary} />
                       </TouchableOpacity>
-                      <TouchableOpacity style={[styles.moreBtn, { backgroundColor: colors.bgSurface }]} onPress={() => duplicateMutation.mutate(item.id)}>
-                        <Ionicons name="copy-outline" size={15} color={colors.textSecondary} />
+                      <TouchableOpacity
+                        style={[styles.moreBtn, { backgroundColor: colors.bgSurface }]}
+                        onPress={() => duplicateMutation.mutate(item.id)}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      >
+                        <Ionicons name="copy-outline" size={13} color={colors.textSecondary} />
                       </TouchableOpacity>
-                      <TouchableOpacity style={[styles.moreBtn, { backgroundColor: colors.dangerMuted }]} onPress={() => handleDeleteProject(item)}>
-                        <Ionicons name="trash-outline" size={15} color={colors.danger} />
+                      <TouchableOpacity
+                        style={[styles.moreBtn, { backgroundColor: colors.dangerMuted }]}
+                        onPress={() => handleDeleteProject(item)}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      >
+                        <Ionicons name="trash-outline" size={13} color={colors.danger} />
                       </TouchableOpacity>
                     </View>
                   </View>
 
-                  <Text style={[styles.projectTitle, { color: colors.textPrimary }]}>{item.title || item.nombre}</Text>
-                  {item.description || item.descripcion ? (
-                    <Text style={[styles.projectDesc, { color: colors.textSecondary }]} numberOfLines={2}>
-                      {item.description || item.descripcion}
-                    </Text>
-                  ) : null}
+                  {/* Progress Line */}
+                  <View style={[styles.barTrack, { backgroundColor: colors.bgSurface }]}>
+                    <View
+                      style={[
+                        styles.barFill,
+                        {
+                          width: `${Math.max(progress, 3)}%`,
+                          backgroundColor: progress === 100 ? colors.mint : projectColor,
+                        },
+                      ]}
+                    />
+                  </View>
 
-                  <View style={styles.datesRow}>
+                  {/* Row 2: Dates (left) | Linked Tasks & Progress & Chevron (right) */}
+                  <View style={styles.bottomMetaRow}>
                     <View style={styles.dateItem}>
-                      <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
+                      <Ionicons name="calendar-outline" size={11} color={colors.textMuted} />
                       <Text style={[styles.dateText, { color: colors.textMuted }]}>
                         {dayjs(item.start_date || (item as any).startDate || item.fechaInicio).format('DD MMM')} -{' '}
                         {dayjs(item.end_date || (item as any).endDate || item.fechaFin).format('DD MMM')}
                       </Text>
                     </View>
-                    <Text style={[styles.progressPct, { color: projectColor }]}>{progress}%</Text>
-                  </View>
 
-                  <View style={[styles.barTrack, { backgroundColor: colors.bgSurface }]}>
-                    <View style={[styles.barFill, { width: `${Math.max(progress, 3)}%`, backgroundColor: projectColor }]} />
-                  </View>
-
-                  <View style={[styles.expandRow, { borderTopColor: colors.borderSubtle }]}>
-                    <Text style={[styles.subtasksCount, { color: colors.textSecondary }]}>
-                      📋 {displayCompleted}/{displayTotal} Tareas vinculadas
-                    </Text>
-                    <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={15} color={colors.textSecondary} />
+                    <View style={styles.bottomMetaRight}>
+                      <Text style={[styles.subtasksCount, { color: colors.textSecondary }]}>
+                        📋 {displayCompleted}/{displayTotal} tareas
+                      </Text>
+                      <Text style={[styles.progressPct, { color: progress === 100 ? colors.mint : projectColor }]}>
+                        {progress}%
+                      </Text>
+                      <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textSecondary} />
+                    </View>
                   </View>
                 </TouchableOpacity>
 
                 {isExpanded && (
-                  <View style={[styles.subtasksSection, { backgroundColor: colors.bgSurface, borderTopColor: colors.border }]}>
+                  <View style={[styles.subtasksSection, { backgroundColor: colors.bgSurface, borderTopColor: colors.borderSubtle }]}>
                     <View style={styles.subtasksList}>
                       {projectTasks.map((t: any) => {
                         const isDone = t.status === 'completada' || t.estado === 'COMPLETADA' || t.is_checked;
-                        const pColor = PRIORITY_COLORS[t.priority as PriorityLevel] || PRIORITY_COLORS[t.prioridad?.toLowerCase() as PriorityLevel] || colors.primary;
+                        const pColor =
+                          PRIORITY_COLORS[t.priority as PriorityLevel] ||
+                          PRIORITY_COLORS[t.prioridad?.toLowerCase() as PriorityLevel] ||
+                          colors.primary;
 
                         return (
                           <TouchableOpacity
                             key={t.id}
-                            style={[styles.subtaskRow, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}
+                            style={[styles.subtaskRow, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}
                             onPress={() => {
                               setDetailTask(t);
                               setDetailModalVisible(true);
@@ -357,22 +382,43 @@ export const ProjectsScreen = () => {
                             activeOpacity={0.7}
                           >
                             <TouchableOpacity onPress={() => handleToggleTaskStatus(t)} style={styles.subtaskCheck}>
-                              <Ionicons name={isDone ? 'checkmark-circle' : 'ellipse-outline'} size={19} color={isDone ? colors.mint : colors.textMuted} />
+                              <View
+                                style={[
+                                  styles.squareCheckbox,
+                                  {
+                                    borderColor: isDone ? colors.mint : colors.borderSubtle,
+                                    backgroundColor: isDone ? colors.mint : 'transparent',
+                                  },
+                                ]}
+                              >
+                                {isDone && <Ionicons name="checkmark" size={11} color="#FFFFFF" />}
+                              </View>
                             </TouchableOpacity>
 
                             <View style={{ flex: 1 }}>
-                              <Text style={[styles.subtaskTitle, { color: colors.textPrimary }, isDone && { textDecorationLine: 'line-through', color: colors.textMuted }]} numberOfLines={1}>
+                              <Text
+                                style={[
+                                  styles.subtaskTitle,
+                                  { color: colors.textPrimary },
+                                  isDone && { textDecorationLine: 'line-through', color: colors.textMuted },
+                                ]}
+                                numberOfLines={1}
+                              >
                                 {t.title || t.titulo}
                               </Text>
                               <Text style={[styles.subtaskSub, { color: colors.textMuted }]} numberOfLines={1}>
                                 {t.assignee?.nombre || t.responsable?.nombre || 'Sin asignar'} •{' '}
-                                {t.due_date || t.fechaVencimiento ? dayjs(String(t.due_date || t.fechaVencimiento).split('T')[0]).format('DD MMM') : 'Sin fecha'}
+                                {t.due_date || t.fechaVencimiento
+                                  ? dayjs(String(t.due_date || t.fechaVencimiento).split('T')[0]).format('DD MMM')
+                                  : 'Sin fecha'}
                               </Text>
                             </View>
 
                             <View style={[styles.priorityPill, { backgroundColor: pColor + '20' }]}>
                               <Text style={[styles.priorityPillText, { color: pColor }]}>
-                                {PRIORITY_LABELS[t.priority as PriorityLevel] || PRIORITY_LABELS[t.prioridad?.toLowerCase() as PriorityLevel] || 'Media'}
+                                {PRIORITY_LABELS[t.priority as PriorityLevel] ||
+                                  PRIORITY_LABELS[t.prioridad?.toLowerCase() as PriorityLevel] ||
+                                  'Media'}
                               </Text>
                             </View>
                           </TouchableOpacity>
@@ -396,7 +442,7 @@ export const ProjectsScreen = () => {
                         }}
                         activeOpacity={0.8}
                       >
-                        <Ionicons name="add-circle-outline" size={15} color="#FFFFFF" />
+                        <Ionicons name="add-circle-outline" size={14} color="#FFFFFF" />
                         <Text style={styles.addFullTaskBtnText}>Agregar Tarea al Plan</Text>
                       </TouchableOpacity>
                     </View>
@@ -593,8 +639,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   listContainer: {
-    padding: 14,
-    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 7,
     paddingBottom: 90,
   },
   emptyState: {
@@ -621,122 +668,129 @@ const styles = StyleSheet.create({
     paddingHorizontal: 25,
   },
   projectCard: {
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
   },
   cardMain: {
-    padding: 11,
-    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    gap: 4,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 6,
   },
-  typeRow: {
+  headerLeftCol: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
   typeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 2.5,
-    borderRadius: 8,
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
   },
   typeText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '800',
     textTransform: 'uppercase',
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   moreBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
   projectTitle: {
-    fontSize: 14,
+    flex: 1,
+    fontSize: 13,
     fontWeight: '800',
   },
-  projectDesc: {
-    fontSize: 11,
-    lineHeight: 15,
+  barTrack: {
+    height: 3,
+    borderRadius: 1.5,
+    overflow: 'hidden',
+    marginVertical: 1,
   },
-  datesRow: {
+  barFill: {
+    height: '100%',
+    borderRadius: 1.5,
+  },
+  bottomMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 2,
+    marginTop: 1,
+  },
+  bottomMetaRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   dateItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   dateText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
   },
   progressPct: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '900',
   },
-  barTrack: {
-    height: 4.5,
-    borderRadius: 2.5,
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    borderRadius: 2.5,
-  },
-  expandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 7,
-    borderTopWidth: 1,
-    marginTop: 2,
-  },
   subtasksCount: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
   },
   subtasksSection: {
     borderTopWidth: 1,
-    padding: 10,
-    gap: 8,
+    padding: 8,
+    gap: 6,
   },
   subtasksList: {
-    gap: 6,
+    gap: 5,
   },
   subtaskRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 8,
-    borderRadius: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 8,
     borderWidth: 1,
-    gap: 8,
+    gap: 6,
   },
   subtaskCheck: {
     padding: 1,
   },
+  squareCheckbox: {
+    width: 17,
+    height: 17,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   subtaskTitle: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
   },
   subtaskSub: {
-    fontSize: 10,
+    fontSize: 9.5,
     marginTop: 1,
   },
   priorityPill: {
@@ -765,12 +819,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
   addFullTaskBtnText: {
     color: '#FFFFFF',
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '800',
   },
   modalOverlay: {

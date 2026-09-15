@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PetColorwayId, PET_COLORWAYS } from '../components/petColorways';
 
-export type MascotType = 'ironman' | 'dog' | 'cat';
+export type MascotType = 'dog' | 'cat' | 'ironman';
 
 export interface MascotTypeOption {
   id: MascotType;
@@ -12,9 +12,9 @@ export interface MascotTypeOption {
 }
 
 export const MASCOT_TYPES: MascotTypeOption[] = [
-  { id: 'ironman', name: 'Iron Man', desc: 'El clásico guía pixel-art de la app', supportsColorway: false },
-  { id: 'dog', name: 'Perro (Shiba)', desc: 'Un compañero peludo siempre atento', supportsColorway: true },
-  { id: 'cat', name: 'Gato', desc: 'Un felino ágil con su propio estilo', supportsColorway: true },
+  { id: 'dog', name: 'Cobi (Perrito)', desc: 'Un compañero peludo y alegre siempre atento', supportsColorway: true },
+  { id: 'cat', name: 'Labi (Gatita)', desc: 'Una felina ágil y astuta con mucho estilo', supportsColorway: true },
+  { id: 'ironman', name: 'Iron Man', desc: 'El clásico superhéroe pixel-art de Stark Tech', supportsColorway: false },
 ];
 
 interface MascotContextType {
@@ -25,7 +25,7 @@ interface MascotContextType {
 }
 
 const MascotContext = createContext<MascotContextType>({
-  mascotType: 'ironman',
+  mascotType: 'dog',
   setMascotType: async () => {},
   mascotColorway: 'shiba',
   setMascotColorway: async () => {},
@@ -35,7 +35,7 @@ const MASCOT_TYPE_KEY = '@colab_mascot_type';
 const MASCOT_COLORWAY_KEY = '@colab_mascot_colorway';
 
 export const MascotProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [mascotType, setMascotTypeState] = useState<MascotType>('ironman');
+  const [mascotType, setMascotTypeState] = useState<MascotType>('dog');
   const [mascotColorway, setMascotColorwayState] = useState<PetColorwayId>('shiba');
 
   useEffect(() => {
@@ -44,6 +44,8 @@ export const MascotProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const savedType = await AsyncStorage.getItem(MASCOT_TYPE_KEY);
         if (savedType && MASCOT_TYPES.some((m) => m.id === savedType)) {
           setMascotTypeState(savedType as MascotType);
+        } else {
+          setMascotTypeState('dog');
         }
         const savedColorway = await AsyncStorage.getItem(MASCOT_COLORWAY_KEY);
         if (savedColorway && PET_COLORWAYS.some((c) => c.id === savedColorway)) {

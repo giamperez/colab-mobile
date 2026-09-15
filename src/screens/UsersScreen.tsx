@@ -20,7 +20,7 @@ import { AppHeader } from '../components/AppHeader';
 import { useAuth } from '../context/AuthContext';
 import { UserModal } from '../components/UserModal';
 import { useTheme } from '../context/ThemeContext';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { User, Group } from '../types';
 
 const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
@@ -32,6 +32,7 @@ const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 export const UsersScreen = () => {
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { colors, isDark } = useTheme();
   const { user: currentUser, isSuperAdmin, canManageUsers } = useAuth();
@@ -170,7 +171,10 @@ export const UsersScreen = () => {
         <FlatList
           data={filteredUsers}
           keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={[
+            styles.listContainer,
+            { paddingBottom: Math.max(insets.bottom, 8) + 85 },
+          ]}
           refreshControl={
             <RefreshControl
               refreshing={isLoading}

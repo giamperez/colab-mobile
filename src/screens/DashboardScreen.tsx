@@ -30,7 +30,7 @@ import {
   TaskStatus,
 } from '../types';
 import type { Task, User } from '../types';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import dayjs from 'dayjs';
 
@@ -43,8 +43,9 @@ const PRIORITIES_LIST: PriorityLevel[] = [
 ];
 
 export const DashboardScreen = () => {
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, bgType } = useTheme();
   const [filterAssignee, setFilterAssignee] = useState<string>('Todos');
   const [filterStatus, setFilterStatus] = useState<string>('Todos');
   const [filterPriority, setFilterPriority] = useState<string>('Todas');
@@ -277,7 +278,13 @@ export const DashboardScreen = () => {
   }, [tasks, filterStatus, filterPriority, filterAssignee]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bgPrimary }]} edges={['top']}>
+    <SafeAreaView
+      style={[
+        styles.container,
+        { backgroundColor: bgType !== 'none' ? 'transparent' : colors.bgPrimary },
+      ]}
+      edges={['top']}
+    >
       <AppHeader
         title="Métricas & Analytics"
         subtitle="Rendimiento del equipo y estado de proyectos"
@@ -286,7 +293,10 @@ export const DashboardScreen = () => {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: Math.max(insets.bottom, 8) + 85 },
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl

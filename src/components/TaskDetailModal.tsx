@@ -499,7 +499,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
   },
   scrollArea: {
-    maxHeight: 460,
+    maxHeight: '75%',
   },
   title: {
     fontSize: 20,

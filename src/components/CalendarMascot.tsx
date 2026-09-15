@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
+import { useMascot } from '../context/MascotContext';
 import { PixelMascot } from './PixelMascot';
 import type { Task } from '../types';
 
@@ -35,8 +36,11 @@ const getDueDate = (t: Task): string | undefined => t.due_date || t.fechaVencimi
 
 export const CalendarMascot: React.FC<CalendarMascotProps> = ({ tasks, userId }) => {
   const { colors, isDark } = useTheme();
+  const { mascotType } = useMascot();
   const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+
+  const mascotDisplayName = mascotType === 'dog' ? 'Cobi' : mascotType === 'cat' ? 'Labi' : 'Tony';
 
   const [isOpen, setIsOpen] = useState(false);
   const [tipIdx, setTipIdx] = useState(0);
@@ -341,7 +345,7 @@ export const CalendarMascot: React.FC<CalendarMascotProps> = ({ tasks, userId })
         {!isOpen && (
           <View style={[styles.mascotLabel, { backgroundColor: isDark ? colors.bgSecondary : '#FFFFFF', borderColor: colors.borderSubtle }]}>
             <Text style={[styles.mascotLabelText, { color: colors.textMuted }]}>
-              {alertCount > 0 ? `${stats.pct}%` : 'Tony'}
+              {alertCount > 0 ? `${stats.pct}%` : mascotDisplayName}
             </Text>
           </View>
         )}

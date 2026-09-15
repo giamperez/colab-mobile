@@ -20,6 +20,7 @@ import { useNotification } from '../context/NotificationContext';
 import { ganttApi } from '../api/gantt.api';
 import { extractArray } from '../api/utils';
 import { AIAssistantModal } from './AIAssistantModal';
+import { InstantVoiceModal } from './InstantVoiceModal';
 
 export interface AppHeaderProps {
   title?: string;
@@ -55,7 +56,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onTaskCreated,
 }) => {
   const { user } = useAuth();
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, bgType } = useTheme();
   const navigation = useNavigation<any>();
   const { showInfo, showSuccess } = useNotification();
 
@@ -63,6 +64,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const [workspaceModalVisible, setWorkspaceModalVisible] = useState(false);
   const [projectModalVisible, setProjectModalVisible] = useState(false);
   const [aiModalVisible, setAiModalVisible] = useState(false);
+  const [voiceModalVisible, setVoiceModalVisible] = useState(false);
   const [aiVoiceMode, setAiVoiceMode] = useState(false);
   const [aiInitialPrompt, setAiInitialPrompt] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -116,9 +118,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   };
 
   const handleDictate = () => {
-    setAiInitialPrompt(quickTitle.trim());
-    setAiVoiceMode(true);
-    setAiModalVisible(true);
+    setVoiceModalVisible(true);
   };
 
   const handleSelectPlan = (id: number | null, name: string) => {
@@ -129,14 +129,20 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     }
   };
 
+  const firstName = user?.nombre?.split(' ')[0] || user?.name?.split(' ')[0] || (user as any)?.first_name || 'Carlos';
+  const displayTitle = title || 'Colab';
+  const displaySubtitle = subtitle || user?.companyName || user?.companies?.[0]?.nombre || 'BY VERTEX';
+
   return (
-    <View style={[styles.rootContainer, { backgroundColor: colors.bgPrimary }]}>
+    <View style={[styles.rootContainer, { backgroundColor: bgType !== 'none' ? 'transparent' : colors.bgPrimary }]}>
       {/* ─── 1. TOP BRAND BAR ────────────────────────────────────────────── */}
       <View
         style={[
           styles.topBar,
           {
-            backgroundColor: isDark ? colors.bgSecondary : colors.bgSecondary,
+            backgroundColor: bgType !== 'none'
+              ? (isDark ? 'rgba(20, 24, 34, 0.75)' : 'rgba(255, 255, 255, 0.85)')
+              : colors.bgSecondary,
             borderBottomColor: colors.borderSubtle,
           },
         ]}
@@ -148,7 +154,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           onPress={() => navigation.navigate('Kanban')}
         >
           {/* Glowing Colab Node Icon */}
-          <View style={styles.logoSquare}>
+          <View style={[styles.logoSquare, { backgroundColor: colors.primary }]}>
             <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
               <Circle cx={6} cy={6} r={3} fill="#FFFFFF" />
               <Circle cx={18} cy={10} r={3.5} fill="#FFFFFF" />
@@ -158,8 +164,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           </View>
 
           <View style={styles.brandTextCol}>
-            <Text style={[styles.brandTitle, { color: colors.textPrimary }]}>{title || 'Colab'}</Text>
-            <Text style={[styles.brandSubtitle, { color: colors.textMuted }]}>{subtitle || 'BY VERTEX'}</Text>
+            <Text style={[styles.brandTitle, { color: colors.textPrimary }]} numberOfLines={1} ellipsizeMode="tail">
+              {displayTitle}
+            </Text>
+            <Text style={[styles.brandSubtitle, { color: colors.textMuted }]} numberOfLines={1} ellipsizeMode="tail">
+              {displaySubtitle}
+            </Text>
           </View>
         </TouchableOpacity>
 
@@ -356,6 +366,16 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         onClose={() => setWorkspaceModalVisible(false)}
       />
 
+      {/* Instant Audio Listening & Auto-Task Creation Modal */}
+      <InstantVoiceModal
+        visible={voiceModalVisible}
+        onClose={() => setVoiceModalVisible(false)}
+        selectedProjectId={selectedProjectId}
+        onTaskCreated={(title) => {
+          if (onTaskCreated) onTaskCreated(title);
+        }}
+      />
+
       {/* AI Assistant Dictator & Task/Project Scheduler Modal */}
       <AIAssistantModal
         visible={aiModalVisible}
@@ -484,6 +504,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    flex: 1,
+    marginRight: 8,
   },
   logoSquare: {
     width: 36,
@@ -499,6 +521,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   brandTextCol: {
+    flex: 1,
     justifyContent: 'center',
   },
   brandTitle: {
@@ -516,6 +539,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flexShrink: 0,
   },
   bellBtn: {
     width: 36,
@@ -543,6 +567,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,
+    flexShrink: 0,
   },
   moreMenuText: {
     fontSize: 12.5,

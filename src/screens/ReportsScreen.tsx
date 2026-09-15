@@ -17,12 +17,13 @@ import { extractArray } from '../api/utils';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { AppHeader } from '../components/AppHeader';
 import { AppDatePicker } from '../components/AppDatePicker';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import type { Report } from '../types';
 import dayjs from 'dayjs';
 
 export const ReportsScreen = () => {
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { colors, isDark } = useTheme();
   const [activeTab, setActiveTab] = useState<'generate' | 'history'>('generate');
@@ -157,7 +158,13 @@ export const ReportsScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: Math.max(insets.bottom, 8) + 85 },
+        ]}
+      >
         {activeTab === 'generate' ? (
           <>
             {/* Options Card */}

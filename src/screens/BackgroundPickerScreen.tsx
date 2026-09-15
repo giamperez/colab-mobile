@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme, BgType, THEME_PRESETS, ThemePreset } from '../context/ThemeContext';
 import { AppHeader } from '../components/AppHeader';
@@ -43,42 +43,43 @@ const PRESET_GRADIENTS = [
 
 const PRESET_IMAGE_URIS = [
   {
-    label: 'Galaxia',
-    uri: 'https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?w=800&q=80',
+    label: 'Montañas & Nubes (Referencia)',
+    uri: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1600&q=80',
   },
   {
-    label: 'Montañas',
-    uri: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80',
+    label: 'Cumbres Alpinas',
+    uri: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1600&q=80',
   },
   {
-    label: 'Bosque',
-    uri: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=800&q=80',
+    label: 'Galaxia Cósmica',
+    uri: 'https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?w=1200&q=80',
   },
   {
-    label: 'Océano',
-    uri: 'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=800&q=80',
+    label: 'Bosque Místico',
+    uri: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=1200&q=80',
+  },
+  {
+    label: 'Océano Profundo',
+    uri: 'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=1200&q=80',
   },
   {
     label: 'Ciudad Noche',
-    uri: 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=800&q=80',
+    uri: 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1200&q=80',
   },
   {
-    label: 'Aurora',
-    uri: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=800&q=80',
+    label: 'Aurora Boreal',
+    uri: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=1200&q=80',
   },
   {
-    label: 'Desierto',
-    uri: 'https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=800&q=80',
-  },
-  {
-    label: 'Abstracto',
-    uri: 'https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=800&q=80',
+    label: 'Arte Abstracto',
+    uri: 'https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=1200&q=80',
   },
 ];
 
 import { useNotification } from '../context/NotificationContext';
 
 export const BackgroundPickerScreen = () => {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { colors, isDark, bgType, bgValue, setBackground, clearBackground, themePreset, setThemePreset } = useTheme();
   const { showSuccess, showError, showInfo, showConfirm } = useNotification();
@@ -163,7 +164,10 @@ export const BackgroundPickerScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 8) + 85 }}
+      >
         {activeTab === 'themes' ? (
           <>
             <Text style={[styles.groupLabel, { color: colors.textSecondary }]}>PALETAS PREESTABLECIDAS</Text>

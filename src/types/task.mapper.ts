@@ -119,7 +119,10 @@ export const mapTaskFromBackend = (rawTask: any): Task => {
     group_id: rawTask.group_id ?? rawTask.groupId ?? rawTask.group?.id ?? null,
     groupId: rawTask.group_id ?? rawTask.groupId ?? rawTask.group?.id ?? null,
     gantt_item_id: rawTask.gantt_item_id || rawTask.ganttItemId || null,
+    project_id: rawTask.project_id ?? rawTask.projectId ?? rawTask.project?.id ?? null,
+    projectId: rawTask.project_id ?? rawTask.projectId ?? rawTask.project?.id ?? null,
     is_checked: !!rawTask.is_checked,
     gantt_item: rawTask.gantt_item || rawTask.ganttItem,
+    project: rawTask.project,
   };
 };

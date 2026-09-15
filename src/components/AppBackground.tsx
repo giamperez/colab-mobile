@@ -11,36 +11,53 @@ interface AppBackgroundProps {
 }
 
 export const AppBackground: React.FC<AppBackgroundProps> = ({ children }) => {
-  const { bgType, bgValue, colors } = useTheme();
+  const { bgType, bgValue, isDark, colors } = useTheme();
 
   if (bgType === 'image' && bgValue) {
     return (
-      <ImageBackground
-        source={{ uri: bgValue }}
-        style={StyleSheet.absoluteFill}
-        imageStyle={{ opacity: 0.25, resizeMode: 'cover' }}
-      >
-        <View style={[styles.overlay, { backgroundColor: colors.bgPrimary + 'CC' }]}>
-          {children}
-        </View>
-      </ImageBackground>
+      <View style={styles.container}>
+        <ImageBackground
+          source={{ uri: bgValue }}
+          style={styles.imageBackground}
+          imageStyle={{ opacity: 0.88, resizeMode: 'cover' }}
+        >
+          {/* Subtle dark glass overlay to guarantee text legibility while keeping mountains vibrant */}
+          <View
+            style={[
+              styles.overlay,
+              {
+                backgroundColor: isDark
+                  ? 'rgba(10, 14, 23, 0.52)'
+                  : 'rgba(255, 255, 255, 0.45)',
+              },
+            ]}
+          >
+            {children}
+          </View>
+        </ImageBackground>
+      </View>
     );
   }
 
   if (bgType === 'color' && bgValue) {
     return (
-      <View style={[styles.fill, { backgroundColor: bgValue }]}>
+      <View style={[styles.container, { backgroundColor: bgValue }]}>
         {children}
       </View>
     );
   }
 
-  return <>{children}</>;
+  return <View style={styles.container}>{children}</View>;
 };
 
 const styles = StyleSheet.create({
-  fill: {
+  container: {
     flex: 1,
+  },
+  imageBackground: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
   },
   overlay: {
     flex: 1,

@@ -19,10 +19,11 @@ import { AppHeader } from '../components/AppHeader';
 import { GroupModal } from '../components/GroupModal';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Group, User, GroupMember } from '../types';
 
 export const GroupsScreen = () => {
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { colors, isDark } = useTheme();
   const { isAdmin } = useAuth();
@@ -136,7 +137,10 @@ export const GroupsScreen = () => {
         <FlatList
           data={groups}
           keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={[
+            styles.listContainer,
+            { paddingBottom: Math.max(insets.bottom, 8) + 85 },
+          ]}
           refreshControl={
             <RefreshControl
               refreshing={isLoading}

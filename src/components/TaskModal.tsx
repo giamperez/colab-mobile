@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { PRIORITY_LABELS, PRIORITY_COLORS } from '../types';
-import type { Task, User, Category, GanttItem, Group, PriorityLevel } from '../types';
+import type { Task, User, Category, GanttItem, Group, PriorityLevel, Project } from '../types';
 import { categoriesApi } from '../api/categories.api';
 import { AppDatePicker } from './AppDatePicker';
 import { useTheme } from '../context/ThemeContext';
@@ -27,6 +27,7 @@ interface TaskModalProps {
   categories: Category[];
   ganttItems?: GanttItem[];
   groups?: Group[];
+  projects?: Project[];
   initialGanttItemId?: number | null;
   initialStartDate?: string;
   initialDueDate?: string;
@@ -50,6 +51,7 @@ export const TaskModal = ({
   categories = [],
   ganttItems = [],
   groups = [],
+  projects = [],
   initialGanttItemId,
   initialStartDate,
   initialDueDate,
@@ -65,8 +67,23 @@ export const TaskModal = ({
   const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [groupId, setGroupId] = useState<number | null>(null);
-  const [ganttItemId, setGanttItemId] = useState<number | null>(null);
+  // Combined project/plan selection: '' | `gantt-{id}` | `proj-{id}`
+  const [projectSelection, setProjectSelection] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const projectOptions = React.useMemo(() => {
+    const opts: { value: string; label: string; color?: string }[] = [];
+    ganttItems.forEach((item) => {
+      opts.push({ value: `gantt-${item.id}`, label: item.title || item.nombre || `Plan #${item.id}`, color: item.color });
+    });
+    projects.forEach((p) => {
+      const label = p.nombre || p.name || `Proyecto #${p.id}`;
+      if (!opts.some((o) => o.label.toLowerCase() === label.toLowerCase())) {
+        opts.push({ value: `proj-${p.id}`, label, color: p.color });
+      }
+    });
+    return opts;
+  }, [ganttItems, projects]);
 
   // Inline Category Creation
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
@@ -108,7 +125,9 @@ export const TaskModal = ({
           : ''
       );
       setGroupId(task.group_id ?? task.groupId ?? null);
-      setGanttItemId(task.gantt_item_id || null);
+      const taskGanttId = task.gantt_item_id;
+      const taskProjectId = task.project_id ?? task.projectId;
+      setProjectSelection(taskGanttId ? `gantt-${taskGanttId}` : taskProjectId ? `proj-${taskProjectId}` : '');
     } else {
       const today = new Date().toISOString().split('T')[0];
       setTitle('');
@@ -119,7 +138,7 @@ export const TaskModal = ({
       setStartDate(initialStartDate || today);
       setDueDate(initialDueDate || today);
       setGroupId(null);
-      setGanttItemId(initialGanttItemId || null);
+      setProjectSelection(initialGanttItemId ? `gantt-${initialGanttItemId}` : '');
     }
   }, [task, visible, categories, initialGanttItemId, initialStartDate, initialDueDate]);
 
@@ -172,7 +191,12 @@ export const TaskModal = ({
         execution_date: startDate || today,
         due_date: dueDate || undefined,
         group_id: groupId || undefined,
-        gantt_item_id: ganttItemId || undefined,
+        gantt_item_id: projectSelection.startsWith('gantt-')
+          ? Number(projectSelection.replace('gantt-', ''))
+          : undefined,
+        project_id: projectSelection.startsWith('proj-')
+          ? Number(projectSelection.replace('proj-', ''))
+          : undefined,
       };
 
       await onSave(payload);
@@ -484,10 +508,10 @@ export const TaskModal = ({
               </>
             )}
 
-            {/* Proyecto Gantt */}
-            {ganttItems.length > 0 && (
+            {/* Proyecto (planes de Gantt + proyectos registrados) */}
+            {projectOptions.length > 0 && (
               <>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>ASOCIAR A PROYECTO GANTT</Text>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>PROYECTO (OPCIONAL)</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>
                   <TouchableOpacity
                     style={[
@@ -496,37 +520,37 @@ export const TaskModal = ({
                         backgroundColor: colors.bgSurface,
                         borderColor: colors.border,
                       },
-                      ganttItemId === null && {
+                      projectSelection === '' && {
                         backgroundColor: colors.primary,
                         borderColor: colors.primary,
                       },
                     ]}
-                    onPress={() => setGanttItemId(null)}
+                    onPress={() => setProjectSelection('')}
                   >
                     <Text
                       style={[
                         styles.catChipText,
                         { color: colors.textSecondary },
-                        ganttItemId === null && { color: '#FFFFFF', fontWeight: '800' },
+                        projectSelection === '' && { color: '#FFFFFF', fontWeight: '800' },
                       ]}
                     >
-                      Sin proyecto
+                      Ninguno
                     </Text>
                   </TouchableOpacity>
-                  {ganttItems.map((gi) => {
-                    const isSelected = ganttItemId === gi.id;
+                  {projectOptions.map((opt) => {
+                    const isSelected = projectSelection === opt.value;
                     return (
                       <TouchableOpacity
-                        key={gi.id}
+                        key={opt.value}
                         style={[
                           styles.catChip,
                           {
                             backgroundColor: colors.bgSurface,
                             borderColor: colors.border,
                           },
-                          isSelected && { backgroundColor: gi.color || colors.primary, borderColor: gi.color || colors.primary },
+                          isSelected && { backgroundColor: opt.color || colors.primary, borderColor: opt.color || colors.primary },
                         ]}
-                        onPress={() => setGanttItemId(gi.id)}
+                        onPress={() => setProjectSelection(opt.value)}
                       >
                         <Text
                           style={[
@@ -535,7 +559,7 @@ export const TaskModal = ({
                             isSelected && { color: '#FFFFFF', fontWeight: '800' },
                           ]}
                         >
-                          {gi.title || gi.nombre}
+                          {opt.label}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -611,7 +635,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
   },
   formScroll: {
-    maxHeight: 480,
+    maxHeight: '75%',
   },
   label: {
     fontSize: 11,

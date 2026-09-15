@@ -26,8 +26,7 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({ visible, onClose }
   const { user, logout } = useAuth();
   const { colors, isDark } = useTheme();
   const { width } = useWindowDimensions();
-
-  const drawerWidth = Math.min(width * 0.8, 320);
+  const drawerWidth = Math.min(Math.max(width * 0.82, 280), 380);
 
   const isSuperAdmin = user?.rol === 'SUPERADMIN' || user?.rol === 'superadmin';
   const isAdmin = isSuperAdmin || user?.rol === 'ADMIN' || user?.rol === 'admin';

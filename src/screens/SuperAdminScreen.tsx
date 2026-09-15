@@ -17,7 +17,7 @@ import client from '../api/client';
 import { extractArray } from '../api/utils';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { AppHeader } from '../components/AppHeader';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -46,6 +46,7 @@ interface Workspace {
 }
 
 export const SuperAdminScreen = () => {
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { colors, isDark } = useTheme();
   const { isSuperAdmin, isAdmin } = useAuth();
@@ -248,7 +249,10 @@ export const SuperAdminScreen = () => {
           <FlatList
             data={filteredWorkspaces}
             keyExtractor={(item) => String(item.id)}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[
+              styles.listContent,
+              { paddingBottom: Math.max(insets.bottom, 8) + 85 },
+            ]}
             refreshControl={
               <RefreshControl
                 refreshing={isLoadingWorkspaces}
@@ -315,7 +319,10 @@ export const SuperAdminScreen = () => {
           <FlatList
             data={filteredTasks}
             keyExtractor={(item) => String(item.id)}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[
+              styles.listContent,
+              { paddingBottom: Math.max(insets.bottom, 8) + 85 },
+            ]}
             refreshControl={
               <RefreshControl
                 refreshing={isLoadingTasks}

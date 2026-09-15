@@ -57,6 +57,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ onCenterPlusPress })
             { color: isTareasActive ? colors.primary : colors.textMuted },
             isTareasActive && styles.activeLabel,
           ]}
+          numberOfLines={1}
         >
           Tareas
         </Text>
@@ -79,6 +80,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ onCenterPlusPress })
             { color: isProyectosActive ? colors.primary : colors.textMuted },
             isProyectosActive && styles.activeLabel,
           ]}
+          numberOfLines={1}
         >
           Proyectos
         </Text>
@@ -112,6 +114,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ onCenterPlusPress })
             { color: isGanttActive ? colors.primary : colors.textMuted },
             isGanttActive && styles.activeLabel,
           ]}
+          numberOfLines={1}
         >
           Gantt
         </Text>
@@ -134,6 +137,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ onCenterPlusPress })
             { color: isCalendarActive ? colors.primary : colors.textMuted },
             isCalendarActive && styles.activeLabel,
           ]}
+          numberOfLines={1}
         >
           Calendario
         </Text>

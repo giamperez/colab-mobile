@@ -53,8 +53,8 @@ export const tasksApi = {
       undefined;
     const category_id = data.category_id || data.categoriaId || data.category?.id || 1;
     const group_id = data.group_id || data.groupId || data.group?.id || undefined;
-    const gantt_item_id =
-      data.gantt_item_id || data.ganttItemId || data.projectId || undefined;
+    const gantt_item_id = data.gantt_item_id || data.ganttItemId || undefined;
+    const project_id = data.project_id || data.projectId || undefined;
 
     // Dates formatted YYYY-MM-DD using local time
     const todayLocal = dayjs().format('YYYY-MM-DD');
@@ -93,6 +93,7 @@ export const tasksApi = {
       category_id,
       group_id,
       gantt_item_id,
+      project_id,
       execution_date: execDate,
       due_date: dueDate,
       priority: prioRaw,
@@ -105,6 +106,7 @@ export const tasksApi = {
       categoryId: category_id ? Number(category_id) : undefined,
       groupId: group_id ? Number(group_id) : undefined,
       ganttItemId: gantt_item_id ? Number(gantt_item_id) : undefined,
+      projectId: project_id ? Number(project_id) : undefined,
       fechaInicio: execDate,
       fechaVencimiento: dueDate,
       prioridad: prioridadEnum,
@@ -152,6 +154,12 @@ export const tasksApi = {
     if (data.execution_date) payload.execution_date = String(data.execution_date).split('T')[0];
     if (data.due_date) payload.due_date = String(data.due_date).split('T')[0];
     if (data.fechaVencimiento && !data.due_date) payload.due_date = String(data.fechaVencimiento).split('T')[0];
+    if (data.gantt_item_id !== undefined && data.ganttItemId === undefined) {
+      payload.ganttItemId = data.gantt_item_id ? Number(data.gantt_item_id) : null;
+    }
+    if (data.project_id !== undefined && data.projectId === undefined) {
+      payload.projectId = data.project_id ? Number(data.project_id) : null;
+    }
 
     return client.patch(`/tasks/${id}`, payload).then((res) => ({ ...res, data: mapTaskFromBackend(res.data) }));
   },

@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  Platform,
+  PermissionsAndroid,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -28,22 +30,17 @@ import type { Task, User, GanttItem, Group } from '../types';
 import dayjs from 'dayjs';
 import { parseTaskPrompt } from '../utils/aiPromptParser';
 
-// Turned off until the app has a development build with the native module
-// compiled in — expo-speech-recognition crashes on import under Expo Go
-// ("Cannot find native module 'ExpoSpeechRecognition'"), so it's required
-// lazily and only when this flag is on. Flip to true once the dev build is ready.
-const VOICE_DICTATION_ENABLED = false;
+// Voice Dictation enabled for continuous Spanish speech-to-text
+const VOICE_DICTATION_ENABLED = true;
 
 let ExpoSpeechRecognitionModule: any = null;
 let useSpeechRecognitionEvent: (name: string, handler: (event: any) => void) => void = () => {};
-if (VOICE_DICTATION_ENABLED) {
-  try {
-    const speechModule = require('expo-speech-recognition');
-    ExpoSpeechRecognitionModule = speechModule.ExpoSpeechRecognitionModule;
-    useSpeechRecognitionEvent = speechModule.useSpeechRecognitionEvent;
-  } catch (e) {
-    console.warn('expo-speech-recognition unavailable — voice dictation disabled.', e);
-  }
+try {
+  const speechModule = require('expo-speech-recognition');
+  ExpoSpeechRecognitionModule = speechModule?.ExpoSpeechRecognitionModule;
+  useSpeechRecognitionEvent = speechModule?.useSpeechRecognitionEvent || (() => {});
+} catch (e) {
+  // Graceful fallback when running in standard Expo Go without native build
 }
 
 // The /agenda/process response returns raw Prisma task rows (titulo, prioridad,
@@ -254,23 +251,55 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
   useEffect(() => {
     if (!VOICE_DICTATION_ENABLED) return;
     let cancelled = false;
-    if (visible && isRecording) {
-      finalTranscriptRef.current = promptText;
-      ExpoSpeechRecognitionModule.requestPermissionsAsync().then((result: any) => {
-        if (cancelled) return;
-        if (!result.granted) {
-          setIsRecording(false);
-          showError('Permiso denegado', 'Activa el micrófono y el reconocimiento de voz en Ajustes para dictar.');
-          return;
+
+    const startRecording = async () => {
+      if (Platform.OS === 'android') {
+        try {
+          await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+            {
+              title: 'Permiso de Micrófono',
+              message: 'Colab necesita acceso al micrófono para el dictado por voz.',
+              buttonPositive: 'Permitir',
+              buttonNegative: 'Cancelar',
+            }
+          );
+        } catch (err) {
+          console.warn('PermissionsAndroid error in AIAssistantModal:', err);
         }
-        ExpoSpeechRecognitionModule.start({
-          lang: 'es-ES',
-          interimResults: true,
-          continuous: true,
-        });
-      });
-    } else {
-      ExpoSpeechRecognitionModule.stop();
+      }
+
+      if (ExpoSpeechRecognitionModule?.requestPermissionsAsync) {
+        finalTranscriptRef.current = promptText;
+        ExpoSpeechRecognitionModule.requestPermissionsAsync()
+          .then((result: any) => {
+            if (cancelled) return;
+            if (!result?.granted) {
+              setIsRecording(false);
+              showError('Permiso denegado', 'Activa el micrófono y el reconocimiento de voz en Ajustes para dictar.');
+              return;
+            }
+            ExpoSpeechRecognitionModule.start({
+              lang: 'es-ES',
+              interimResults: true,
+              continuous: true,
+            });
+          })
+          .catch((err: any) => {
+            if (!cancelled) {
+              setIsRecording(false);
+              showError('Error de micrófono', 'No se pudo iniciar el reconocimiento de voz.');
+            }
+          });
+      }
+    };
+
+    if (visible && isRecording) {
+      startRecording();
+    } else if (ExpoSpeechRecognitionModule) {
+      try {
+        ExpoSpeechRecognitionModule.stop();
+      } catch (_) {}
     }
     return () => {
       cancelled = true;
@@ -319,22 +348,31 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
       queryClient.invalidateQueries({ queryKey: ['tasks-dashboard-all'] });
       queryClient.invalidateQueries({ queryKey: ['gantt-items'] });
       queryClient.invalidateQueries({ queryKey: ['gantt-list'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks-agenda'] });
 
-      const count = data.tasks_created || (data.tasks ? data.tasks.length : 0);
-      if (count > 0 && data.tasks && data.tasks.length > 0) {
-        setCreatedCount(count);
-        setProcessedTasks(data.tasks);
-        showSuccess('¡IA completada!', `Se crearon y agendaron ${count} elemento(s).`);
-      } else {
-        // If backend agenda returned 0 tasks (e.g. prompt is a direct task instead of whatsapp format),
-        // fallback to smart NLP task creation
-        handleDirectCreate();
-      }
+      const rawTasks = (data as any)?.tasks || (data as any)?.data || (Array.isArray(data) ? data : []);
+      const mapped: ProcessedTaskResult[] = rawTasks.map((t: any) => ({
+        id: t.id,
+        titulo: t.title || t.titulo || 'Tarea creada con IA',
+        prioridad: t.priority || t.prioridad,
+        fechaVencimiento: t.due_date || t.fechaVencimiento || t.execution_date,
+        responsableId: t.assignee_id || t.responsableId || t.assignee?.id,
+        hora: t.time || t.hora || null,
+        recordatorioMinutos: t.recordatorioMinutos || null,
+      }));
+
+      setProcessedTasks(mapped);
+      setCreatedCount(mapped.length);
+      showSuccess(
+        'Procesado con éxito',
+        mapped.length === 1
+          ? `Se agendó 1 tarea: "${mapped[0].titulo}"`
+          : `Se agendaron ${mapped.length} tareas en tu calendario.`
+      );
     },
     onError: (err: any) => {
-      console.log('AI backend error, using smart NLP task creator:', err);
-      // Fallback: direct task create using parsed NLP data
-      handleDirectCreate();
+      console.error('Error processing AI prompt:', err);
+      showError('Error al procesar', err.response?.data?.message || 'No se pudo procesar la instrucción con IA.');
     },
   });
 
@@ -365,35 +403,44 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
     return result;
   };
 
-  // Smart single task creation with clean title, assignee, time and date
-  const handleDirectCreate = async () => {
-    if (!promptText.trim()) return;
+  // Helper to get formatted priority text & color
+  const getPriorityInfo = (pri?: string) => {
+    const p = (pri?.toLowerCase() as PriorityLevel) || 'media';
+    return {
+      label: PRIORITY_LABELS[p] || 'Media',
+      color: PRIORITY_COLORS[p] || colors.primary,
+    };
+  };
+
+  // Quick action to add directly with clarified parameters (bypass full AI parse if user just wants simple add)
+  const handleQuickAddDirectly = async () => {
+    const finalTitle = clarificationData.title?.trim() || promptText.trim();
+    if (!finalTitle) return;
+
     try {
       const parsed = parseTaskPrompt(promptText, users, projects);
-      const finalTitle = clarificationData.title?.trim() || parsed.title || promptText.trim();
-      const finalAssigneeId = clarificationData.assigneeId || parsed.assigneeId || user?.id;
       const finalDate = clarificationData.date || parsed.date || dayjs().format('YYYY-MM-DD');
-      const finalPriority = (clarificationData.priority as PriorityLevel) || parsed.priority || 'media';
-      const finalDesc = clarificationData.description || parsed.description || undefined;
+      const finalPriority = clarificationData.priority || parsed.priority || 'media';
+      const finalAssigneeId = clarificationData.assigneeId !== undefined ? clarificationData.assigneeId : parsed.assigneeId;
+      const finalProjectId = clarificationData.projectId !== undefined ? clarificationData.projectId : parsed.projectId;
 
       const res = await tasksApi.create({
         title: finalTitle,
-        description: finalDesc,
-        assignee_id: finalAssigneeId,
-        gantt_item_id: clarificationData.projectId || parsed.projectId,
-        group_id: clarificationData.groupId,
+        titulo: finalTitle,
         execution_date: finalDate,
         due_date: finalDate,
         priority: finalPriority,
+        assignee_id: finalAssigneeId || undefined,
+        gantt_item_id: finalProjectId || undefined,
+        status: 'pendiente',
       });
 
       queryClient.invalidateQueries({ queryKey: ['tasks-kanban-all'] });
       queryClient.invalidateQueries({ queryKey: ['tasks-kanban'] });
-      queryClient.invalidateQueries({ queryKey: ['tasks-dashboard-all'] });
       queryClient.invalidateQueries({ queryKey: ['gantt-items'] });
       queryClient.invalidateQueries({ queryKey: ['gantt-list'] });
 
-      const newTaskId = res.data?.id || Date.now();
+      const newTaskId = (res as any)?.data?.id || Date.now();
       setCreatedCount(1);
       setProcessedTasks([
         {
@@ -458,7 +505,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
             {createdCount === null ? (
               <>
                 {/* Input & Dictation Area */}
-                <View style={[styles.inputBox, { backgroundColor: colors.bgSurface, borderColor: isRecording ? '#EF4444' : colors.borderSubtle }]}>
+                <View style={[styles.inputBox, { backgroundColor: colors.bgSurface, borderColor: isRecording ? colors.primary : colors.borderSubtle }]}>
                   <TextInput
                     style={[styles.mainInput, { color: colors.textPrimary }]}
                     placeholder="Escribe o dicta una tarea, minuta o planificación (ej. 'Crear campaña de lanzamiento para el viernes con Juan')..."
@@ -475,15 +522,12 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
                     <TouchableOpacity
                       style={[
                         styles.micBtn,
-                        VOICE_DICTATION_ENABLED
-                          ? { backgroundColor: isRecording ? '#EF444422' : colors.bgSecondary, borderColor: isRecording ? '#EF4444' : colors.borderSubtle }
-                          : { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle, opacity: 0.5 },
+                        {
+                          backgroundColor: isRecording ? colors.primaryMuted : colors.bgSecondary,
+                          borderColor: isRecording ? colors.primary : colors.borderSubtle,
+                        },
                       ]}
                       onPress={() => {
-                        if (!VOICE_DICTATION_ENABLED) {
-                          showError('Dictado no disponible', 'El dictado por voz está desactivado temporalmente mientras se termina de configurar la app.');
-                          return;
-                        }
                         setIsRecording((prev) => !prev);
                       }}
                       activeOpacity={0.75}
@@ -492,11 +536,11 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
                         <Ionicons
                           name={isRecording ? 'mic' : 'mic-outline'}
                           size={18}
-                          color={isRecording ? '#EF4444' : colors.primary}
+                          color={colors.primary}
                         />
                       </Animated.View>
-                      <Text style={[styles.micLabel, { color: isRecording ? '#EF4444' : colors.textSecondary }]}>
-                        {!VOICE_DICTATION_ENABLED ? 'Dictado no disponible' : isRecording ? 'Escuchando voz...' : 'Dictar por voz'}
+                      <Text style={[styles.micLabel, { color: isRecording ? colors.primary : colors.textSecondary }]}>
+                        {isRecording ? 'Escuchando tu voz...' : 'Dictar por voz'}
                       </Text>
                     </TouchableOpacity>
 

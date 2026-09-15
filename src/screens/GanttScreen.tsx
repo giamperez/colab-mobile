@@ -17,6 +17,7 @@ import { groupsApi } from '../api/groups.api';
 import { usersApi } from '../api/users.api';
 import { categoriesApi } from '../api/categories.api';
 import { tasksApi } from '../api/tasks.api';
+import { projectsApi } from '../api/projects.api';
 import { extractArray } from '../api/utils';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { AppHeader } from '../components/AppHeader';
@@ -34,8 +35,8 @@ import {
   TaskStatus,
   PriorityLevel,
 } from '../types';
-import type { GanttItem, Group, User, Category, Task } from '../types';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import type { GanttItem, Group, User, Category, Task, Project } from '../types';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import dayjs from 'dayjs';
 
@@ -59,6 +60,7 @@ const GANTT_BAR_COLORS = [
 ];
 
 export const GanttScreen = () => {
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { colors, isDark } = useTheme();
   const timelineScrollRef = useRef<ScrollView>(null);
@@ -117,10 +119,16 @@ export const GanttScreen = () => {
     queryFn: () => tasksApi.getAll({ includeDeleted: 'false' }).then((res) => res.data),
   });
 
+  const { data: rawProjects } = useQuery({
+    queryKey: ['projects-list'],
+    queryFn: () => projectsApi.getAll().then((res) => res.data),
+  });
+
   const items: GanttItem[] = useMemo(() => extractArray<GanttItem>(rawItems), [rawItems]);
   const groups: Group[] = useMemo(() => extractArray<Group>(rawGroups), [rawGroups]);
   const users: User[] = useMemo(() => extractArray<User>(rawUsers), [rawUsers]);
   const categories: Category[] = useMemo(() => extractArray<Category>(rawCategories), [rawCategories]);
+  const projects: Project[] = useMemo(() => extractArray<Project>(rawProjects), [rawProjects]);
   const allTasks: Task[] = useMemo(() => {
     // Defensive deduplication by id
     const raw = extractArray<Task>(rawTasks);
@@ -246,6 +254,18 @@ export const GanttScreen = () => {
     }
     return result;
   }, [currentDate, timeframe, todayStr]);
+
+  const headerTitle = useMemo(() => {
+    if (timeframe === 'semana') {
+      const start = currentDate.startOf('week');
+      const end = start.add(13, 'day');
+      const sameMonth = start.month() === end.month() && start.year() === end.year();
+      return sameMonth
+        ? `${start.format('DD')} - ${end.format('DD MMM YYYY')}`
+        : `${start.format('DD MMM')} - ${end.format('DD MMM YYYY')}`;
+    }
+    return currentDate.format('MMMM YYYY');
+  }, [currentDate, timeframe]);
 
   const timelineWidth = timelineDays.length * DAY_COL_WIDTH;
   const startRangeDate = timelineDays[0]?.dateStr || todayStr;
@@ -575,7 +595,10 @@ export const GanttScreen = () => {
       ) : (
         <ScrollView
           style={styles.mainScroll}
-          contentContainerStyle={styles.mainScrollContent}
+          contentContainerStyle={[
+            styles.mainScrollContent,
+            { paddingBottom: Math.max(insets.bottom, 8) + 85 },
+          ]}
           refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor="#FF5C8A" />}
         >
           <View style={[styles.ganttCardBox, { backgroundColor: bgCard, borderColor: borderColor }]}>
@@ -588,7 +611,7 @@ export const GanttScreen = () => {
                 </TouchableOpacity>
 
                 <Text style={[styles.monthNavTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                  {currentDate.format('MMMM YYYY').toUpperCase()}
+                  {headerTitle.toUpperCase()}
                 </Text>
 
                 <TouchableOpacity onPress={handleNext} style={[styles.navIconBtn, { backgroundColor: isDark ? '#282A38' : '#EDE9FE' }]}>
@@ -909,6 +932,7 @@ export const GanttScreen = () => {
         categories={categories}
         ganttItems={items}
         groups={groups}
+        projects={projects}
         initialGanttItemId={selectedGanttForTask?.id}
         initialStartDate={selectedGanttForTask?.start_date || (selectedGanttForTask as any)?.startDate}
         initialDueDate={selectedGanttForTask?.end_date || (selectedGanttForTask as any)?.endDate}

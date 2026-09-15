@@ -27,6 +27,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { PRIORITY_LABELS, PRIORITY_COLORS, TaskStatus, PriorityLevel } from '../types';
 import type { Task } from '../types';
 import { useTheme } from '../context/ThemeContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IronManPose } from './PixelIronMan';
 import { PixelMascot } from './PixelMascot';
 import { triggerTaskCompleted } from '../utils/taskCompletionEvents';
@@ -608,6 +609,7 @@ export const DraggableKanbanBoard = ({
   onAddToColumn,
   onDragStateChange,
 }: DraggableKanbanBoardProps) => {
+  const insets = useSafeAreaInsets();
   const { colors } = useTheme();
 
   // Drag state
@@ -1042,7 +1044,10 @@ export const DraggableKanbanBoard = ({
         ref={boardScrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={bStyles.boardContent}
+        contentContainerStyle={[
+          bStyles.boardContent,
+          { paddingBottom: Math.max(insets.bottom, 8) + 140 },
+        ]}
         onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
           scrollOffsetRef.current = e.nativeEvent.contentOffset.x;
         }}

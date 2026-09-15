@@ -78,7 +78,7 @@ export const LoginScreen = () => {
           >
             <Ionicons name="sparkles" size={32} color="#FFFFFF" />
           </View>
-          <Text style={[styles.brandTitle, { color: colors.textPrimary }]}>ComoVamos Mobile</Text>
+          <Text style={[styles.brandTitle, { color: colors.textPrimary }]}>Colab</Text>
           <Text style={[styles.brandSubtitle, { color: colors.textSecondary }]}>
             Gestión corporativa de objetivos, proyectos y equipos
           </Text>

@@ -13,9 +13,10 @@ import { useTheme } from '../context/ThemeContext';
 import { AppHeader } from '../components/AppHeader';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { WorkspaceSwitcherModal } from '../components/WorkspaceSwitcherModal';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const MenuScreen = () => {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { user, isSuperAdmin, isAdmin } = useAuth();
   const { colors, isDark, toggleTheme } = useTheme();
@@ -136,7 +137,13 @@ export const MenuScreen = () => {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bgPrimary }]} edges={['top']}>
       <AppHeader title="Menú Principal" subtitle="Acceso a todas las herramientas de COLAB" />
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: Math.max(insets.bottom, 8) + 85 },
+        ]}
+      >
         {/* User Card */}
         <TouchableOpacity
           style={[
@@ -285,7 +292,7 @@ export const MenuScreen = () => {
 
         <View style={styles.footerInfo}>
           <Text style={[styles.footerText, { color: colors.textMuted }]}>
-            COLAB Mobile • Versión 1.0.0
+            Colab • Versión 1.0.0
           </Text>
         </View>
 

@@ -23,6 +23,7 @@ import { usersApi } from '../api/users.api';
 import { categoriesApi } from '../api/categories.api';
 import { ganttApi } from '../api/gantt.api';
 import { groupsApi } from '../api/groups.api';
+import { projectsApi } from '../api/projects.api';
 import { extractArray } from '../api/utils';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { TaskModal } from '../components/TaskModal';
@@ -40,15 +41,13 @@ import {
   TaskStatus,
   PriorityLevel,
 } from '../types';
-import type { Task, User, Category, GanttItem, Group } from '../types';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import type { Task, User, Category, GanttItem, Group, Project } from '../types';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useWindowDimensions } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import dayjs from 'dayjs';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const COLUMN_WIDTH = SCREEN_WIDTH * 0.78;
 
 interface ColumnDef {
   id: TaskStatus;
@@ -56,6 +55,9 @@ interface ColumnDef {
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
 }
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const COLUMN_WIDTH = Math.min(Math.max(SCREEN_WIDTH * 0.8, 280), 360);
 
 const COLUMNS: ColumnDef[] = [
   { id: 'pendiente', label: 'Pendiente', icon: 'time-outline', color: '#94A3B8' },
@@ -68,12 +70,14 @@ const COLUMNS: ColumnDef[] = [
 export const KanbanScreen = () => {
   const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
-  const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const { colors, isDark, bgType } = useTheme();
   const { user: currentUser, isSuperAdmin, isAdmin, isJefe, isColaborador, canForceDelete } = useAuth();
   const { showError, showSuccess } = useNotification();
 
-  // Mode: 'list' (default Asana-style) or 'kanban' (board)
-  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  // Mode: 'kanban' (default board) or 'list'
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
   const [onlyMyTasks, setOnlyMyTasks] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -101,6 +105,10 @@ export const KanbanScreen = () => {
   // Quick inline add task
   const [quickAddSection, setQuickAddSection] = useState<string | null>(null);
   const [quickTaskTitle, setQuickTaskTitle] = useState('');
+
+  // Inline rename task/meeting
+  const [renamingTaskId, setRenamingTaskId] = useState<number | null>(null);
+  const [renamingTitle, setRenamingTitle] = useState('');
 
   // Drag state (shared with DraggableKanbanBoard)
   const [hoveredColumn, setHoveredColumn] = useState<TaskStatus | null>(null);
@@ -145,6 +153,11 @@ export const KanbanScreen = () => {
     queryFn: () => groupsApi.getAll().then((res) => res.data),
   });
 
+  const { data: rawProjects } = useQuery({
+    queryKey: ['projects-list'],
+    queryFn: () => projectsApi.getAll().then((res) => res.data),
+  });
+
   const allTasks: Task[] = useMemo(() => {
     // Defensive deduplication by id (in case API returns multiple rows per assignee)
     const raw = extractArray<Task>(rawTasks);
@@ -159,6 +172,7 @@ export const KanbanScreen = () => {
   const categories: Category[] = useMemo(() => extractArray<Category>(rawCategories), [rawCategories]);
   const ganttItems: GanttItem[] = useMemo(() => extractArray<GanttItem>(rawGantt), [rawGantt]);
   const groups: Group[] = useMemo(() => extractArray<Group>(rawGroups), [rawGroups]);
+  const projects: Project[] = useMemo(() => extractArray<Project>(rawProjects), [rawProjects]);
 
   const todayStr = dayjs().format('YYYY-MM-DD');
 
@@ -266,6 +280,22 @@ export const KanbanScreen = () => {
       id: task.id,
       dto: { execution_date: todayStr, due_date: todayStr },
     });
+  };
+
+  const handleStartRename = (task: Task) => {
+    setRenamingTaskId(task.id);
+    setRenamingTitle(task.title || task.titulo || '');
+  };
+
+  const handleSaveRename = async (taskId: number) => {
+    const trimmed = renamingTitle.trim();
+    if (trimmed) {
+      await updateTaskMutation.mutateAsync({
+        id: taskId,
+        dto: { title: trimmed, titulo: trimmed },
+      });
+    }
+    setRenamingTaskId(null);
   };
 
   const handleQuickAdd = async (sectionKey: string) => {
@@ -459,6 +489,8 @@ export const KanbanScreen = () => {
       ? [task.assignee]
       : [];
 
+    const isRenaming = renamingTaskId === task.id;
+
     return (
       <TouchableOpacity
         key={task.id}
@@ -470,36 +502,102 @@ export const KanbanScreen = () => {
           },
         ]}
         onPress={() => {
-          setDetailTask(task);
-          setDetailModalVisible(true);
+          if (!isRenaming) {
+            handleStartRename(task);
+          }
         }}
-        activeOpacity={0.7}
+        onLongPress={() => {
+          setQuickMoveTask(task);
+        }}
+        delayLongPress={280}
+        activeOpacity={0.8}
       >
-        {/* Checkbox button */}
+        {/* Reorder / Drag Indicator */}
+        <View style={styles.dragIndicatorBox}>
+          <Ionicons name="reorder-two-outline" size={16} color={colors.textMuted} />
+        </View>
+
+        {/* Square Checkbox Button */}
         <TouchableOpacity
           style={styles.checkTouch}
           onPress={() => handleToggleTaskCheck(task)}
           activeOpacity={0.7}
         >
-          <Ionicons
-            name={isCompleted ? 'checkmark-circle' : 'ellipse-outline'}
-            size={22}
-            color={isCompleted ? colors.mint : isBlocked ? colors.danger : colors.textMuted}
-          />
+          <View
+            style={[
+              styles.squareCheckbox,
+              {
+                borderColor: isCompleted
+                  ? colors.mint
+                  : isBlocked
+                  ? colors.danger
+                  : colors.borderSubtle || '#94A3B8',
+                backgroundColor: isCompleted ? colors.mint : 'transparent',
+              },
+            ]}
+          >
+            {isCompleted ? (
+              <Ionicons name="checkmark" size={13} color="#FFFFFF" />
+            ) : isBlocked ? (
+              <Ionicons name="close" size={11} color={colors.danger} />
+            ) : null}
+          </View>
         </TouchableOpacity>
 
-        {/* Task Title & Subtitle */}
+        {/* Task / Meeting Title & Subtitle - Click title to edit name */}
         <View style={styles.taskInfoCol}>
-          <Text
-            style={[
-              styles.taskTitleText,
-              { color: colors.textPrimary },
-              isCompleted && { textDecorationLine: 'line-through', color: colors.textMuted },
-            ]}
-            numberOfLines={1}
-          >
-            {task.title || task.titulo}
-          </Text>
+          {isRenaming ? (
+            <View style={styles.inlineRenameRow}>
+              <TextInput
+                style={[
+                  styles.inlineRenameInput,
+                  {
+                    color: colors.textPrimary,
+                    backgroundColor: colors.bgSurface,
+                    borderColor: colors.primary,
+                  },
+                ]}
+                value={renamingTitle}
+                onChangeText={setRenamingTitle}
+                autoFocus
+                selectTextOnFocus
+                onSubmitEditing={() => handleSaveRename(task.id)}
+                onBlur={() => handleSaveRename(task.id)}
+                returnKeyType="done"
+              />
+              <TouchableOpacity
+                style={[styles.inlineRenameSaveBtn, { backgroundColor: colors.primary }]}
+                onPress={() => handleSaveRename(task.id)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.inlineRenameCancelBtn}
+                onPress={() => setRenamingTaskId(null)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="close" size={14} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.titleTouch}
+              onPress={() => handleStartRename(task)}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.taskTitleText,
+                  { color: colors.textPrimary },
+                  isCompleted && { textDecorationLine: 'line-through', color: colors.textMuted },
+                ]}
+                numberOfLines={1}
+              >
+                {task.title || task.titulo}
+              </Text>
+            </TouchableOpacity>
+          )}
 
           <View style={styles.taskMetaRow}>
             {task.category?.name ? (
@@ -555,9 +653,22 @@ export const KanbanScreen = () => {
                 </Text>
               </View>
             ) : (
-              <Ionicons name="person-circle-outline" size={20} color={colors.textMuted} />
+              <Ionicons name="person-circle-outline" size={18} color={colors.textMuted} />
             )}
           </View>
+
+          {/* 3-Dots Menu Button to Edit Details / Open Modal */}
+          <TouchableOpacity
+            style={styles.threeDotsBtn}
+            onPress={() => {
+              setDetailTask(task);
+              setDetailModalVisible(true);
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="ellipsis-vertical" size={16} color={colors.textSecondary} />
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -571,7 +682,13 @@ export const KanbanScreen = () => {
   }, [allTasks]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bgPrimary }]} edges={['top']}>
+    <SafeAreaView
+      style={[
+        styles.container,
+        { backgroundColor: bgType !== 'none' ? 'transparent' : colors.bgPrimary },
+      ]}
+      edges={['top']}
+    >
       {/* ─── Colab Modern App Header (Brand, Selectors, Quick Task Input) ─── */}
       <AppHeader
         selectedProjectId={selectedPlanId}
@@ -615,7 +732,10 @@ export const KanbanScreen = () => {
         /* ASANA-STYLE ACCORDION LIST */
         <ScrollView
           style={styles.scrollList}
-          contentContainerStyle={styles.scrollListContent}
+          contentContainerStyle={[
+            styles.scrollListContent,
+            { paddingBottom: Math.max(insets.bottom, 8) + 140 },
+          ]}
           refreshControl={
             <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={colors.primary} />
           }
@@ -709,8 +829,6 @@ export const KanbanScreen = () => {
               Agregar una sección personalizada
             </Text>
           </TouchableOpacity>
-
-          <View style={{ height: 110 }} />
         </ScrollView>
       ) : (
         /* REAL DRAG & DROP KANBAN BOARD */
@@ -736,7 +854,14 @@ export const KanbanScreen = () => {
       )}
 
       {/* Floating Bottom Switcher Toolbar (Asana style) */}
-      <View style={styles.floatingToolbarContainer}>
+      <View
+        style={[
+          styles.floatingToolbarContainer,
+          {
+            bottom: Math.max(insets.bottom, 8) + 64,
+          },
+        ]}
+      >
         <View
           style={[
             styles.floatingBar,
@@ -798,7 +923,17 @@ export const KanbanScreen = () => {
       {viewSelectorOpen && (
         <Modal visible={viewSelectorOpen} transparent animationType="slide" onRequestClose={() => setViewSelectorOpen(false)}>
           <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setViewSelectorOpen(false)}>
-            <View style={[styles.viewSelectorSheet, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+            <View
+              style={[
+                styles.viewSelectorSheet,
+                {
+                  backgroundColor: colors.bgSecondary,
+                  borderColor: colors.border,
+                  maxHeight: '85%',
+                  paddingBottom: Math.max(insets.bottom + 16, 28),
+                },
+              ]}
+            >
               {/* Drag handle */}
               <View style={styles.sheetHandleBox}>
                 <View style={[styles.sheetHandlePill, { backgroundColor: colors.border }]} />
@@ -806,93 +941,95 @@ export const KanbanScreen = () => {
 
               <Text style={[styles.viewSelectorTitle, { color: colors.textPrimary }]}>Elegir una vista</Text>
 
-              {/* Main Views */}
-              <TouchableOpacity
-                style={[styles.viewOptionRow, viewMode === 'list' && { backgroundColor: colors.primaryMuted }]}
-                onPress={() => {
-                  setViewMode('list');
-                  setViewSelectorOpen(false);
-                }}
-              >
-                <Ionicons name="reorder-four-outline" size={20} color={colors.primary} />
-                <Text style={[styles.viewOptionText, { color: colors.textPrimary }, viewMode === 'list' && { fontWeight: '800', color: colors.primary }]}>
-                  Lista
-                </Text>
-                {viewMode === 'list' && <Ionicons name="checkmark" size={18} color={colors.primary} style={styles.viewCheckmark} />}
-              </TouchableOpacity>
+              <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+                {/* Main Views */}
+                <TouchableOpacity
+                  style={[styles.viewOptionRow, viewMode === 'list' && { backgroundColor: colors.primaryMuted }]}
+                  onPress={() => {
+                    setViewMode('list');
+                    setViewSelectorOpen(false);
+                  }}
+                >
+                  <Ionicons name="reorder-four-outline" size={20} color={colors.primary} />
+                  <Text style={[styles.viewOptionText, { color: colors.textPrimary }, viewMode === 'list' && { fontWeight: '800', color: colors.primary }]}>
+                    Lista
+                  </Text>
+                  {viewMode === 'list' && <Ionicons name="checkmark" size={18} color={colors.primary} style={styles.viewCheckmark} />}
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.viewOptionRow, viewMode === 'kanban' && { backgroundColor: colors.primaryMuted }]}
-                onPress={() => {
-                  setViewMode('kanban');
-                  setViewSelectorOpen(false);
-                }}
-              >
-                <Ionicons name="grid-outline" size={20} color={colors.primary} />
-                <Text style={[styles.viewOptionText, { color: colors.textPrimary }, viewMode === 'kanban' && { fontWeight: '800', color: colors.primary }]}>
-                  Tablero (Kanban)
-                </Text>
-                {viewMode === 'kanban' && <Ionicons name="checkmark" size={18} color={colors.primary} style={styles.viewCheckmark} />}
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.viewOptionRow, viewMode === 'kanban' && { backgroundColor: colors.primaryMuted }]}
+                  onPress={() => {
+                    setViewMode('kanban');
+                    setViewSelectorOpen(false);
+                  }}
+                >
+                  <Ionicons name="grid-outline" size={20} color={colors.primary} />
+                  <Text style={[styles.viewOptionText, { color: colors.textPrimary }, viewMode === 'kanban' && { fontWeight: '800', color: colors.primary }]}>
+                    Tablero (Kanban)
+                  </Text>
+                  {viewMode === 'kanban' && <Ionicons name="checkmark" size={18} color={colors.primary} style={styles.viewCheckmark} />}
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.viewOptionRow}
-                onPress={() => {
-                  setViewSelectorOpen(false);
-                  navigation.navigate('Calendar');
-                }}
-              >
-                <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-                <Text style={[styles.viewOptionText, { color: colors.textPrimary }]}>
-                  Calendario
-                </Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={styles.viewCheckmark} />
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.viewOptionRow}
+                  onPress={() => {
+                    setViewSelectorOpen(false);
+                    navigation.navigate('Calendar');
+                  }}
+                >
+                  <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+                  <Text style={[styles.viewOptionText, { color: colors.textPrimary }]}>
+                    Calendario
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={styles.viewCheckmark} />
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.viewOptionRow}
-                onPress={() => {
-                  setViewSelectorOpen(false);
-                  navigation.navigate('Gantt');
-                }}
-              >
-                <Ionicons name="layers-outline" size={20} color={colors.primary} />
-                <Text style={[styles.viewOptionText, { color: colors.textPrimary }]}>
-                  Cronograma (Gantt)
-                </Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={styles.viewCheckmark} />
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.viewOptionRow}
+                  onPress={() => {
+                    setViewSelectorOpen(false);
+                    navigation.navigate('Gantt');
+                  }}
+                >
+                  <Ionicons name="layers-outline" size={20} color={colors.primary} />
+                  <Text style={[styles.viewOptionText, { color: colors.textPrimary }]}>
+                    Cronograma (Gantt)
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={styles.viewCheckmark} />
+                </TouchableOpacity>
 
-              {/* Other Views section */}
-              <Text style={[styles.viewSubHeader, { color: colors.textMuted }]}>Vistas adicionales</Text>
+                {/* Other Views section */}
+                <Text style={[styles.viewSubHeader, { color: colors.textMuted }]}>Vistas adicionales</Text>
 
-              <TouchableOpacity
-                style={styles.viewOptionRow}
-                onPress={() => {
-                  setViewSelectorOpen(false);
-                  navigation.navigate('Dashboard');
-                }}
-              >
-                <Ionicons name="stats-chart-outline" size={20} color={colors.textSecondary} />
-                <Text style={[styles.viewOptionText, { color: colors.textPrimary }]}>
-                  Panel & Métricas
-                </Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={styles.viewCheckmark} />
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.viewOptionRow}
+                  onPress={() => {
+                    setViewSelectorOpen(false);
+                    navigation.navigate('Dashboard');
+                  }}
+                >
+                  <Ionicons name="stats-chart-outline" size={20} color={colors.textSecondary} />
+                  <Text style={[styles.viewOptionText, { color: colors.textPrimary }]}>
+                    Panel & Métricas
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={styles.viewCheckmark} />
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.viewOptionRow}
-                onPress={() => {
-                  setViewSelectorOpen(false);
-                  navigation.navigate('Agenda');
-                }}
-              >
-                <Ionicons name="sparkles-outline" size={20} color={colors.textSecondary} />
-                <Text style={[styles.viewOptionText, { color: colors.textPrimary }]}>
-                  Bitácora & Agenda IA
-                </Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={styles.viewCheckmark} />
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.viewOptionRow}
+                  onPress={() => {
+                    setViewSelectorOpen(false);
+                    navigation.navigate('Agenda');
+                  }}
+                >
+                  <Ionicons name="sparkles-outline" size={20} color={colors.textSecondary} />
+                  <Text style={[styles.viewOptionText, { color: colors.textPrimary }]}>
+                    Bitácora & Agenda IA
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={styles.viewCheckmark} />
+                </TouchableOpacity>
+              </ScrollView>
             </View>
           </TouchableOpacity>
         </Modal>
@@ -902,34 +1039,46 @@ export const KanbanScreen = () => {
       {quickMoveTask && (
         <Modal visible={!!quickMoveTask} transparent animationType="fade" onRequestClose={() => setQuickMoveTask(null)}>
           <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setQuickMoveTask(null)}>
-            <View style={[styles.quickMoveSheet, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+            <View
+              style={[
+                styles.quickMoveSheet,
+                {
+                  backgroundColor: colors.bgSecondary,
+                  borderColor: colors.border,
+                  maxHeight: '85%',
+                  paddingBottom: Math.max(insets.bottom + 16, 28),
+                },
+              ]}
+            >
               <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Mover Tarea</Text>
               <Text style={[styles.sheetSub, { color: colors.textMuted }]}>{quickMoveTask.title || quickMoveTask.titulo}</Text>
 
-              <View style={styles.sheetOptions}>
-                {COLUMNS.map((col) => {
-                  const isCurrent = quickMoveTask.status === col.id;
-                  return (
-                    <TouchableOpacity
-                      key={col.id}
-                      style={[
-                        styles.sheetOptionBtn,
-                        { backgroundColor: colors.bgSurface, borderColor: colors.borderSubtle },
-                        isCurrent && { borderColor: col.color, backgroundColor: col.color + '15' },
-                      ]}
-                      onPress={async () => {
-                        await updateStatusMutation.mutateAsync({ id: quickMoveTask.id, status: col.id });
-                        setQuickMoveTask(null);
-                      }}
-                    >
-                      <Ionicons name={col.icon} size={18} color={col.color} />
-                      <Text style={[styles.sheetOptionText, { color: colors.textPrimary }, isCurrent && { color: col.color, fontWeight: '800' }]}>
-                        {col.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={styles.sheetOptions}>
+                  {COLUMNS.map((col) => {
+                    const isCurrent = quickMoveTask.status === col.id;
+                    return (
+                      <TouchableOpacity
+                        key={col.id}
+                        style={[
+                          styles.sheetOptionBtn,
+                          { backgroundColor: colors.bgSurface, borderColor: colors.borderSubtle },
+                          isCurrent && { borderColor: col.color, backgroundColor: col.color + '15' },
+                        ]}
+                        onPress={async () => {
+                          await updateStatusMutation.mutateAsync({ id: quickMoveTask.id, status: col.id });
+                          setQuickMoveTask(null);
+                        }}
+                      >
+                        <Ionicons name={col.icon} size={18} color={col.color} />
+                        <Text style={[styles.sheetOptionText, { color: colors.textPrimary }, isCurrent && { color: col.color, fontWeight: '800' }]}>
+                          {col.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </ScrollView>
             </View>
           </TouchableOpacity>
         </Modal>
@@ -947,6 +1096,7 @@ export const KanbanScreen = () => {
         categories={categories}
         ganttItems={ganttItems}
         groups={groups}
+        projects={projects}
         onCategoryCreated={() => queryClient.invalidateQueries({ queryKey: ['categories-list'] })}
         onSave={async (taskData) => {
           if (editingTask) {
@@ -1008,96 +1158,108 @@ export const KanbanScreen = () => {
       {filterMenuOpen && (
         <Modal visible={filterMenuOpen} transparent animationType="slide" onRequestClose={() => setFilterMenuOpen(false)}>
           <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setFilterMenuOpen(false)}>
-            <View style={[styles.filterSheet, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+            <View
+              style={[
+                styles.filterSheet,
+                {
+                  backgroundColor: colors.bgSecondary,
+                  borderColor: colors.border,
+                  maxHeight: '85%',
+                  paddingBottom: Math.max(insets.bottom + 16, 28),
+                },
+              ]}
+            >
               <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Filtros Avanzados</Text>
 
-              {/* Plazo / Fecha (Horizonte Temporal) */}
-              <Text style={[styles.filterGroupLabel, { color: colors.textSecondary }]}>Plazo / Fecha</Text>
-              <View style={styles.filterChipRow}>
-                {[
-                  { id: 'hoy', label: '📅 Hoy' },
-                  { id: 'semana', label: '🗓️ Esta Semana' },
-                  { id: 'mes', label: '📆 Este Mes' },
-                  { id: 'proximas', label: '⏳ Próximas' },
-                  { id: 'todas', label: 'Todas' },
-                ].map((item) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={[
-                      styles.filterChip,
-                      { backgroundColor: colors.bgSurface, borderColor: colors.borderSubtle },
-                      dateHorizon === item.id && { backgroundColor: colors.primaryMuted, borderColor: colors.primary },
-                    ]}
-                    onPress={() => setDateHorizon(item.id as any)}
-                  >
-                    <Text
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {/* Plazo / Fecha (Horizonte Temporal) */}
+                <Text style={[styles.filterGroupLabel, { color: colors.textSecondary }]}>Plazo / Fecha</Text>
+                <View style={styles.filterChipRow}>
+                  {[
+                    { id: 'hoy', label: '📅 Hoy' },
+                    { id: 'semana', label: '🗓️ Esta Semana' },
+                    { id: 'mes', label: '📆 Este Mes' },
+                    { id: 'proximas', label: '⏳ Próximas' },
+                    { id: 'todas', label: 'Todas' },
+                  ].map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
                       style={[
-                        styles.filterChipText,
-                        { color: colors.textSecondary },
-                        dateHorizon === item.id && { color: colors.primary, fontWeight: '800' },
+                        styles.filterChip,
+                        { backgroundColor: colors.bgSurface, borderColor: colors.borderSubtle },
+                        dateHorizon === item.id && { backgroundColor: colors.primaryMuted, borderColor: colors.primary },
                       ]}
+                      onPress={() => setDateHorizon(item.id as any)}
                     >
-                      {item.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                      <Text
+                        style={[
+                          styles.filterChipText,
+                          { color: colors.textSecondary },
+                          dateHorizon === item.id && { color: colors.primary, fontWeight: '800' },
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
 
-              {/* Overdue filter */}
-              <Text style={[styles.filterGroupLabel, { color: colors.textSecondary }]}>Vigencia</Text>
-              <View style={styles.filterChipRow}>
-                {[
-                  { id: 'vigentes', label: '✨ Vigentes' },
-                  { id: 'vencidas', label: '🔴 Vencidas' },
-                  { id: 'all', label: 'Todas' },
-                ].map((item) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={[
-                      styles.filterChip,
-                      { backgroundColor: colors.bgSurface, borderColor: colors.borderSubtle },
-                      overdueFilter === item.id && { backgroundColor: colors.primaryMuted, borderColor: colors.primary },
-                    ]}
-                    onPress={() => setOverdueFilter(item.id as any)}
-                  >
-                    <Text
+                {/* Overdue filter */}
+                <Text style={[styles.filterGroupLabel, { color: colors.textSecondary }]}>Vigencia</Text>
+                <View style={styles.filterChipRow}>
+                  {[
+                    { id: 'vigentes', label: '✨ Vigentes' },
+                    { id: 'vencidas', label: '🔴 Vencidas' },
+                    { id: 'all', label: 'Todas' },
+                  ].map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
                       style={[
-                        styles.filterChipText,
-                        { color: colors.textSecondary },
-                        overdueFilter === item.id && { color: colors.primary, fontWeight: '800' },
+                        styles.filterChip,
+                        { backgroundColor: colors.bgSurface, borderColor: colors.borderSubtle },
+                        overdueFilter === item.id && { backgroundColor: colors.primaryMuted, borderColor: colors.primary },
                       ]}
+                      onPress={() => setOverdueFilter(item.id as any)}
                     >
-                      {item.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                      <Text
+                        style={[
+                          styles.filterChipText,
+                          { color: colors.textSecondary },
+                          overdueFilter === item.id && { color: colors.primary, fontWeight: '800' },
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
 
-              {/* Priority Filter */}
-              <Text style={[styles.filterGroupLabel, { color: colors.textSecondary }]}>Prioridad</Text>
-              <View style={styles.filterChipRow}>
-                {(['muy_alta', 'alta', 'media', 'baja', 'muy_baja'] as PriorityLevel[]).map((p) => (
-                  <TouchableOpacity
-                    key={p}
-                    style={[
-                      styles.filterChip,
-                      { backgroundColor: colors.bgSurface, borderColor: colors.borderSubtle },
-                      selectedPriority === p && { backgroundColor: PRIORITY_COLORS[p] + '25', borderColor: PRIORITY_COLORS[p] },
-                    ]}
-                    onPress={() => setSelectedPriority(selectedPriority === p ? null : p)}
-                  >
-                    <Text
+                {/* Priority Filter */}
+                <Text style={[styles.filterGroupLabel, { color: colors.textSecondary }]}>Prioridad</Text>
+                <View style={styles.filterChipRow}>
+                  {(['muy_alta', 'alta', 'media', 'baja', 'muy_baja'] as PriorityLevel[]).map((p) => (
+                    <TouchableOpacity
+                      key={p}
                       style={[
-                        styles.filterChipText,
-                        { color: colors.textSecondary },
-                        selectedPriority === p && { color: PRIORITY_COLORS[p], fontWeight: '800' },
+                        styles.filterChip,
+                        { backgroundColor: colors.bgSurface, borderColor: colors.borderSubtle },
+                        selectedPriority === p && { backgroundColor: PRIORITY_COLORS[p] + '25', borderColor: PRIORITY_COLORS[p] },
                       ]}
+                      onPress={() => setSelectedPriority(selectedPriority === p ? null : p)}
                     >
-                      {PRIORITY_LABELS[p]}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                      <Text
+                        style={[
+                          styles.filterChipText,
+                          { color: colors.textSecondary },
+                          selectedPriority === p && { color: PRIORITY_COLORS[p], fontWeight: '800' },
+                        ]}
+                      >
+                        {PRIORITY_LABELS[p]}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
 
               {/* Clear & Apply */}
               <View style={styles.filterSheetFooter}>
@@ -1129,7 +1291,17 @@ export const KanbanScreen = () => {
             activeOpacity={1}
             onPress={() => setCreateMenuVisible(false)}
           >
-            <View style={[styles.createChooserSheet, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+            <View
+              style={[
+                styles.createChooserSheet,
+                {
+                  backgroundColor: colors.bgSecondary,
+                  borderColor: colors.border,
+                  maxHeight: '85%',
+                  paddingBottom: Math.max(insets.bottom + 16, 28),
+                },
+              ]}
+            >
               <View style={styles.sheetHandleBox}>
                 <View style={[styles.sheetHandlePill, { backgroundColor: colors.border }]} />
               </View>
@@ -1139,51 +1311,53 @@ export const KanbanScreen = () => {
                 Selecciona el tipo de elemento a registrar
               </Text>
 
-              <View style={styles.createOptionsList}>
-                {/* 1. Nueva Tarea */}
-                <TouchableOpacity
-                  style={[styles.createOptionCard, { backgroundColor: colors.bgSurface, borderColor: colors.borderSubtle }]}
-                  onPress={() => {
-                    setCreateMenuVisible(false);
-                    setEditingTask(null);
-                    setTaskModalVisible(true);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.createOptionIconCircle, { backgroundColor: colors.primaryMuted }]}>
-                    <Ionicons name="checkbox-outline" size={22} color={colors.primary} />
-                  </View>
-                  <View style={styles.createOptionTextCol}>
-                    <Text style={[styles.createOptionTitle, { color: colors.textPrimary }]}>Nueva Tarea</Text>
-                    <Text style={[styles.createOptionDesc, { color: colors.textSecondary }]}>
-                      Crear tarea con fecha límite, asignados y prioridad
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-                </TouchableOpacity>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={styles.createOptionsList}>
+                  {/* 1. Nueva Tarea */}
+                  <TouchableOpacity
+                    style={[styles.createOptionCard, { backgroundColor: colors.bgSurface, borderColor: colors.borderSubtle }]}
+                    onPress={() => {
+                      setCreateMenuVisible(false);
+                      setEditingTask(null);
+                      setTaskModalVisible(true);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.createOptionIconCircle, { backgroundColor: colors.primaryMuted }]}>
+                      <Ionicons name="checkbox-outline" size={22} color={colors.primary} />
+                    </View>
+                    <View style={styles.createOptionTextCol}>
+                      <Text style={[styles.createOptionTitle, { color: colors.textPrimary }]}>Nueva Tarea</Text>
+                      <Text style={[styles.createOptionDesc, { color: colors.textSecondary }]}>
+                        Crear tarea con fecha límite, asignados y prioridad
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                  </TouchableOpacity>
 
-                {/* 2. Nuevo Proyecto / Plan */}
-                <TouchableOpacity
-                  style={[styles.createOptionCard, { backgroundColor: colors.bgSurface, borderColor: colors.borderSubtle }]}
-                  onPress={() => {
-                    setCreateMenuVisible(false);
-                    setEditingGanttItem(null);
-                    setGanttModalVisible(true);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.createOptionIconCircle, { backgroundColor: '#8B5CF622' }]}>
-                    <Ionicons name="layers-outline" size={22} color="#8B5CF6" />
-                  </View>
-                  <View style={styles.createOptionTextCol}>
-                    <Text style={[styles.createOptionTitle, { color: colors.textPrimary }]}>Nuevo Proyecto / Plan</Text>
-                    <Text style={[styles.createOptionDesc, { color: colors.textSecondary }]}>
-                      Crear planificación, campaña o cronograma
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-                </TouchableOpacity>
-              </View>
+                  {/* 2. Nuevo Proyecto / Plan */}
+                  <TouchableOpacity
+                    style={[styles.createOptionCard, { backgroundColor: colors.bgSurface, borderColor: colors.borderSubtle }]}
+                    onPress={() => {
+                      setCreateMenuVisible(false);
+                      setEditingGanttItem(null);
+                      setGanttModalVisible(true);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.createOptionIconCircle, { backgroundColor: '#8B5CF622' }]}>
+                      <Ionicons name="layers-outline" size={22} color="#8B5CF6" />
+                    </View>
+                    <View style={styles.createOptionTextCol}>
+                      <Text style={[styles.createOptionTitle, { color: colors.textPrimary }]}>Nuevo Proyecto / Plan</Text>
+                      <Text style={[styles.createOptionDesc, { color: colors.textSecondary }]}>
+                        Crear planificación, campaña o cronograma
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
             </View>
           </TouchableOpacity>
         </Modal>
@@ -1347,21 +1521,63 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 7,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 8,
+    gap: 7,
+  },
+  dragIndicatorBox: {
+    paddingRight: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   checkTouch: {
     padding: 2,
+  },
+  squareCheckbox: {
+    width: 19,
+    height: 19,
+    borderRadius: 5,
+    borderWidth: 1.8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   taskInfoCol: {
     flex: 1,
     justifyContent: 'center',
   },
+  titleTouch: {
+    flexShrink: 1,
+  },
   taskTitleText: {
     fontSize: 13.5,
     fontWeight: '700',
     lineHeight: 18,
+  },
+  inlineRenameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginVertical: 1,
+  },
+  inlineRenameInput: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 1.2,
+    height: 32,
+  },
+  inlineRenameSaveBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inlineRenameCancelBtn: {
+    padding: 4,
   },
   taskMetaRow: {
     flexDirection: 'row',
@@ -1376,7 +1592,13 @@ const styles = StyleSheet.create({
   taskRightBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
+  },
+  threeDotsBtn: {
+    padding: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 2,
   },
   dateBadge: {
     paddingHorizontal: 5,

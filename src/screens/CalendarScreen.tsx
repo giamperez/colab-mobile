@@ -15,6 +15,7 @@ import { extractArray } from '../api/utils';
 import { categoriesApi } from '../api/categories.api';
 import { ganttApi } from '../api/gantt.api';
 import { groupsApi } from '../api/groups.api';
+import { projectsApi } from '../api/projects.api';
 import { usersApi } from '../api/users.api';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { AppHeader } from '../components/AppHeader';
@@ -29,8 +30,8 @@ import {
   TaskStatus,
   PriorityLevel,
 } from '../types';
-import type { Task, User, Category, GanttItem, Group } from '../types';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import type { Task, User, Category, GanttItem, Group, Project } from '../types';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import dayjs from 'dayjs';
@@ -43,6 +44,7 @@ const MONTH_NAMES = [
 const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
 export const CalendarScreen = () => {
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { colors, isDark } = useTheme();
   const { user } = useAuth();
@@ -84,10 +86,16 @@ export const CalendarScreen = () => {
     queryFn: () => groupsApi.getAll().then((res) => res.data),
   });
 
+  const { data: rawProjects } = useQuery({
+    queryKey: ['projects-list-calendar'],
+    queryFn: () => projectsApi.getAll().then((res) => res.data),
+  });
+
   const users: User[] = extractArray<User>(rawUsers);
   const categories: Category[] = extractArray<Category>(rawCategories);
   const ganttItems: GanttItem[] = extractArray<GanttItem>(rawGantt);
   const groups: Group[] = extractArray<Group>(rawGroups);
+  const projects: Project[] = extractArray<Project>(rawProjects);
 
   // Mutations
   const updateTaskMutation = useMutation({
@@ -356,7 +364,14 @@ export const CalendarScreen = () => {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bgPrimary }]} edges={['top']}>
       <AppHeader title="Calendario" subtitle="Programa mensual de tareas y fechas límite" />
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, 8) + 85 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* ─── 1. TOP SEGMENTED VIEW SWITCHER: [ Mes | Semana | Día ] ────────── */}
         <View style={[styles.viewSwitcherCard, { backgroundColor: isDark ? colors.bgSecondary : colors.primaryMuted }]}>
           {[
@@ -789,6 +804,7 @@ export const CalendarScreen = () => {
         categories={categories}
         ganttItems={ganttItems}
         groups={groups}
+        projects={projects}
         onCategoryCreated={() => queryClient.invalidateQueries({ queryKey: ['categories-list-calendar'] })}
         onSave={async (taskData) => {
           if (editingTask) {

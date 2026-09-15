@@ -161,12 +161,26 @@ export interface Task {
   };
   groupNombre?: string;
   gantt_item_id?: number | null;
+  project_id?: number | null;
+  projectId?: number | null;
   is_checked?: boolean;
   gantt_item?: {
     id: number;
     title: string;
     color: string;
   };
+  project?: {
+    id: number;
+    name?: string;
+    nombre?: string;
+  };
+}
+
+export interface Project {
+  id: number;
+  name?: string;
+  nombre?: string;
+  color?: string;
 }
 
 export interface GanttSubtask {

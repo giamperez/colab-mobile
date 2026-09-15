@@ -20,11 +20,12 @@ import { PixelCat } from '../components/PixelCat';
 import { AppHeader } from '../components/AppHeader';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { WorkspaceSwitcherModal } from '../components/WorkspaceSwitcherModal';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useNotification } from '../context/NotificationContext';
 
 export const ProfileScreen = () => {
+  const insets = useSafeAreaInsets();
   const { user, updateProfile, logout } = useAuth();
   const { colors, isDark, themeMode, setThemeMode, themePreset, setThemePreset } = useTheme();
   const { mascotType, setMascotType, mascotColorway, setMascotColorway } = useMascot();
@@ -120,7 +121,13 @@ export const ProfileScreen = () => {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bgPrimary }]} edges={['top']}>
       <AppHeader title="Mi Perfil" subtitle="Configuración de cuenta y apariencia" />
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: Math.max(insets.bottom, 8) + 85 },
+        ]}
+      >
         {/* User Card */}
         <View
           style={[

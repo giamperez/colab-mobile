@@ -25,3 +25,4 @@ export const PixelMascot: React.FC<PixelMascotProps> = (props) => {
 };
 
 export default PixelMascot;
+

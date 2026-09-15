@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -12,10 +13,29 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import { useMascot } from '../context/MascotContext';
 import { PixelMascot } from './PixelMascot';
 import type { Task } from '../types';
 
 const RESTING_KEY_PREFIX = '@ironman_pixel_guide_resting2_';
+const LAST_VISIT_KEY_PREFIX = '@mascot_last_visit_';
+
+/** Returns the greeting word based on the current hour */
+const getTimeGreeting = (): string => {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return 'Buenos días';
+  if (hour >= 12 && hour < 19) return 'Buenas tardes';
+  return 'Buenas noches';
+};
+
+/** Returns an emoji matching the time of day */
+const getTimeEmoji = (): string => {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return '☀️';
+  if (hour >= 12 && hour < 19) return '👋';
+  return '🌙';
+};
 
 export interface IronManGuideProps {
   tasks?: Task[];
@@ -43,11 +63,42 @@ export const IronManGuide: React.FC<IronManGuideProps> = ({
   isAdminOrJefe = false,
   isGrabbing = false,
 }) => {
+  const { user } = useAuth();
+  const { mascotType } = useMascot();
   const { colors, isDark } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
+  const firstName = user?.nombre?.split(' ')[0] || user?.name?.split(' ')[0] || (user as any)?.first_name || 'Carlos';
+  const mascotDisplayName = mascotType === 'dog' ? 'Cobi' : mascotType === 'cat' ? 'Labi' : 'Tony';
+
+  const [showWelcomeBubble, setShowWelcomeBubble] = useState(true);
+  const [isFirstVisitToday, setIsFirstVisitToday] = useState(false);
+  const welcomeBubbleScale = useRef(new Animated.Value(0)).current;
+  const welcomeBubbleOpacity = useRef(new Animated.Value(0)).current;
+
+  const timeGreeting = getTimeGreeting();
+  const timeEmoji = getTimeEmoji();
+
   const restingKey = `${RESTING_KEY_PREFIX}${userId ?? 'anon'}`;
+  const lastVisitKey = `${LAST_VISIT_KEY_PREFIX}${userId ?? 'anon'}`;
+
+  /** Check if this is the first time the user opens the app today */
+  useEffect(() => {
+    const checkFirstVisit = async () => {
+      try {
+        const today = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
+        const lastVisit = await AsyncStorage.getItem(lastVisitKey);
+        if (lastVisit !== today) {
+          setIsFirstVisitToday(true);
+          await AsyncStorage.setItem(lastVisitKey, today);
+        }
+      } catch {
+        // silently ignore
+      }
+    };
+    checkFirstVisit();
+  }, [lastVisitKey]);
 
   const [isOpen, setIsOpen] = useState(false);
   const [tipIdx, setTipIdx] = useState(0);
@@ -68,7 +119,7 @@ export const IronManGuide: React.FC<IronManGuideProps> = ({
 
   // Fixed anchor point for mascot bottom-right corner
   const baseRight = 14;
-  const baseBottom = insets.bottom + 70;
+  const baseBottom = Math.max(insets.bottom, 8) + 68;
 
   // Compute card anchor: opens to the LEFT of the mascot
   // We need absolute left position for the card
@@ -148,7 +199,29 @@ export const IronManGuide: React.FC<IronManGuideProps> = ({
     );
     floatLoop.start();
     zzzLoop.start();
-    return () => { floatLoop.stop(); zzzLoop.stop(); };
+
+    // Show welcome bubble greeting on startup
+    const welcomeTimer = setTimeout(() => {
+      Animated.parallel([
+        Animated.spring(welcomeBubbleScale, { toValue: 1, friction: 5, tension: 180, useNativeDriver: true }),
+        Animated.timing(welcomeBubbleOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+      ]).start();
+    }, 400);
+
+    // Auto-dismiss after 6.5 seconds
+    const dismissTimer = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(welcomeBubbleScale, { toValue: 0.8, duration: 200, useNativeDriver: true }),
+        Animated.timing(welcomeBubbleOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+      ]).start(() => setShowWelcomeBubble(false));
+    }, 6500);
+
+    return () => {
+      floatLoop.stop();
+      zzzLoop.stop();
+      clearTimeout(welcomeTimer);
+      clearTimeout(dismissTimer);
+    };
   }, []);
 
   // ─── PanResponder for dragging ────────────────────────────────────────────
@@ -359,6 +432,50 @@ export const IronManGuide: React.FC<IronManGuideProps> = ({
           </Animated.View>
         )}
 
+        {/* Startup Welcome Speech Bubble from Mascot */}
+        {showWelcomeBubble && !isOpen && (
+          <Animated.View
+            style={[
+              styles.welcomeSpeechBubble,
+              {
+                backgroundColor: isDark ? colors.bgSecondary : '#FFFFFF',
+                borderColor: colors.primary,
+                opacity: welcomeBubbleOpacity,
+                transform: [{ scale: welcomeBubbleScale }],
+              },
+            ]}
+          >
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => {
+                setShowWelcomeBubble(false);
+                openTooltip();
+              }}
+            >
+              <Text style={[styles.welcomeSpeechText, { color: colors.textPrimary }]}>
+                {isFirstVisitToday
+                  ? `${timeGreeting}, `
+                  : '¡De vuelta, '}
+                <Text style={{ color: colors.primary, fontWeight: '900' }}>{firstName}</Text>
+                {isFirstVisitToday ? ` ${timeEmoji}` : '! 😊'}
+              </Text>
+              <Text style={[styles.welcomeSpeechSub, { color: colors.textSecondary }]}>
+                {isFirstVisitToday
+                  ? `${mascotDisplayName} te da la bienvenida ✨`
+                  : `${mascotDisplayName} está contigo 💪`}
+              </Text>
+            </TouchableOpacity>
+            <View
+              style={[
+                styles.speechTail,
+                {
+                  borderTopColor: isDark ? colors.bgSecondary : '#FFFFFF',
+                },
+              ]}
+            />
+          </Animated.View>
+        )}
+
         {/* Mascot sprite */}
         <PixelMascot pose={pose} pixelSize={1.9} />
 
@@ -366,7 +483,7 @@ export const IronManGuide: React.FC<IronManGuideProps> = ({
         {!isOpen && (
           <View style={[styles.mascotLabel, { backgroundColor: isDark ? colors.bgSecondary : '#FFFFFF', borderColor: colors.borderSubtle }]}>
             <Text style={[styles.mascotLabelText, { color: colors.textMuted }]}>
-              {alertCount > 0 ? `${userStats.pct}%` : 'Tony'}
+              {alertCount > 0 ? `${userStats.pct}%` : mascotDisplayName}
             </Text>
           </View>
         )}
@@ -519,6 +636,43 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     lineHeight: 14,
     fontStyle: 'italic',
+  },
+  welcomeSpeechBubble: {
+    position: 'absolute',
+    bottom: 58,
+    right: -10,
+    width: 175,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 8,
+    zIndex: 300,
+  },
+  welcomeSpeechText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  welcomeSpeechSub: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  speechTail: {
+    position: 'absolute',
+    bottom: -7,
+    right: 28,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 7,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
   },
 });
 

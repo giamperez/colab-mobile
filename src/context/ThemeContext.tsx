@@ -5,12 +5,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export type ThemeMode = 'dark' | 'light' | 'system';
 
 export type ThemePreset =
-  | 'asana_dark'    // Asana Charcoal (Default, matte dark #1E1F21 + Coral/Red #FF5E5B)
-  | 'obsidian'      // Pitch Black OLED #0D0E11 + Electric Blue #3B82F6
-  | 'slate_dark'    // Deep Slate Navy #0F172A + Cyan #38BDF8
-  | 'emerald_dark'  // Dark Forest #0B1512 + Mint #10B981
-  | 'iris_purple'   // Original Violet #0E1533 + Iris #7C83FF
-  | 'light_clean';  // Modern Crisp Light #F8FAFC + Indigo/Coral
+  | 'light_purple'   // Claro Morado Elegante (Default #7C3AED)
+  | 'light_blue'     // Claro Azul Profesional #2563EB
+  | 'light_green'    // Claro Verde Esmeralda #059669
+  | 'asana_dark'     // Asana Charcoal (Mate dark #1E1F21 + Violeta #8B5CF6)
+  | 'obsidian'       // Pitch Black OLED #0D0E11 + Electric Blue #3B82F6
+  | 'slate_dark'     // Deep Slate Navy #0F172A + Cyan #38BDF8
+  | 'emerald_dark'   // Dark Forest #0B1512 + Mint #10B981
+  | 'iris_purple'    // Original Violet #0E1533 + Iris #7C83FF
+  | 'light_clean';   // Compatibilidad previa
 
 export interface ThemeColors {
   // Primary / Brand
@@ -76,17 +79,17 @@ export interface ThemeColors {
   navInactiveColor: string;
 }
 
-// ─── 1. ASANA CHARCOAL (DEFAULT DARK - Clean Neutral Matte Dark) ─────────────
+// ─── 1. ASANA CHARCOAL (Clean Neutral Matte Dark + Purple) ──────────────────
 const asanaDarkColors: ThemeColors = {
-  primary: '#FF5E5B', // Asana Coral / Warm Red
-  primaryLight: '#FF7D7A',
-  primaryMuted: 'rgba(255, 94, 91, 0.16)',
-  accent: '#F59E0B',
-  accentMuted: 'rgba(245, 158, 11, 0.16)',
+  primary: '#8B5CF6', // Neutral Violet / Purple
+  primaryLight: '#A78BFA',
+  primaryMuted: 'rgba(139, 92, 246, 0.16)',
+  accent: '#06B6D4',
+  accentMuted: 'rgba(6, 182, 212, 0.16)',
   mint: '#10B981',
   mintMuted: 'rgba(16, 185, 129, 0.16)',
-  rose: '#EF4444',
-  roseMuted: 'rgba(239, 68, 68, 0.16)',
+  rose: '#EC4899',
+  roseMuted: 'rgba(236, 72, 153, 0.16)',
   blueSoft: '#38BDF8',
 
   success: '#10B981',
@@ -112,7 +115,7 @@ const asanaDarkColors: ThemeColors = {
 
   border: '#343639',
   borderSubtle: '#2A2B2D',
-  borderFocus: '#FF5E5B',
+  borderFocus: '#8B5CF6',
 
   statusPendiente: '#94A3B8',
   statusProceso: '#3B82F6',
@@ -361,18 +364,18 @@ const irisPurpleColors: ThemeColors = {
   navInactiveColor: '#76799E',
 };
 
-// ─── 6. LIGHT CLEAN (Modern Crisp White) ─────────────────────────────────────
-const lightColors: ThemeColors = {
-  primary: '#FF5E5B',
-  primaryLight: '#FF7D7A',
-  primaryMuted: 'rgba(255, 94, 91, 0.12)',
-  accent: '#F97316',
-  accentMuted: 'rgba(249, 115, 22, 0.12)',
+// ─── 6. LIGHT PURPLE (DEFAULT CLARO - Neutral Modern Violet) ─────────────────
+const lightPurpleColors: ThemeColors = {
+  primary: '#7C3AED', // Deep Royal Violet (Neutral, Elegant)
+  primaryLight: '#9353D3',
+  primaryMuted: 'rgba(124, 58, 237, 0.12)',
+  accent: '#06B6D4',
+  accentMuted: 'rgba(6, 182, 212, 0.12)',
   mint: '#10B981',
   mintMuted: 'rgba(16, 185, 129, 0.12)',
-  rose: '#EF4444',
-  roseMuted: 'rgba(239, 68, 68, 0.12)',
-  blueSoft: '#3B82F6',
+  rose: '#EC4899',
+  roseMuted: 'rgba(236, 72, 153, 0.12)',
+  blueSoft: '#6366F1',
 
   success: '#10B981',
   successMuted: 'rgba(16, 185, 129, 0.12)',
@@ -380,7 +383,7 @@ const lightColors: ThemeColors = {
   warningMuted: 'rgba(245, 158, 11, 0.12)',
   danger: '#EF4444',
   dangerMuted: 'rgba(239, 68, 68, 0.12)',
-  info: '#3B82F6',
+  info: '#7C3AED',
 
   bgPrimary: '#F8FAFC',
   bgSecondary: '#FFFFFF',
@@ -397,7 +400,64 @@ const lightColors: ThemeColors = {
 
   border: '#E2E8F0',
   borderSubtle: '#F1F5F9',
-  borderFocus: '#FF5E5B',
+  borderFocus: '#7C3AED',
+
+  statusPendiente: '#64748B',
+  statusProceso: '#3B82F6',
+  statusRevision: '#A855F7',
+  statusCompletada: '#10B981',
+  statusBloqueada: '#EF4444',
+  statusVencida: '#EF4444',
+
+  prioMuyAlta: '#EF4444',
+  prioAlta: '#F97316',
+  prioMedia: '#22C55E',
+  prioBaja: '#3B82F6',
+  prioMuyBaja: '#8B5CF6',
+
+  navBg: '#FFFFFF',
+  navActiveBg: 'rgba(124, 58, 237, 0.12)',
+  navActiveColor: '#7C3AED',
+  navInactiveColor: '#94A3B8',
+};
+
+// ─── 7. LIGHT BLUE (Claro Azul Corporativo) ──────────────────────────────────
+const lightBlueColors: ThemeColors = {
+  primary: '#2563EB', // Sapphire Blue
+  primaryLight: '#60A5FA',
+  primaryMuted: 'rgba(37, 99, 235, 0.12)',
+  accent: '#0D9488',
+  accentMuted: 'rgba(13, 148, 136, 0.12)',
+  mint: '#10B981',
+  mintMuted: 'rgba(16, 185, 129, 0.12)',
+  rose: '#EF4444',
+  roseMuted: 'rgba(239, 68, 68, 0.12)',
+  blueSoft: '#38BDF8',
+
+  success: '#10B981',
+  successMuted: 'rgba(16, 185, 129, 0.12)',
+  warning: '#F59E0B',
+  warningMuted: 'rgba(245, 158, 11, 0.12)',
+  danger: '#EF4444',
+  dangerMuted: 'rgba(239, 68, 68, 0.12)',
+  info: '#2563EB',
+
+  bgPrimary: '#F8FAFC',
+  bgSecondary: '#FFFFFF',
+  bgSurface: '#F0F9FF',
+  bgCard: '#FFFFFF',
+  bgCardElevated: '#FFFFFF',
+  bgModal: '#FFFFFF',
+  bgOverlay: 'rgba(15, 23, 42, 0.6)',
+
+  textPrimary: '#0F172A',
+  textSecondary: '#475569',
+  textMuted: '#94A3B8',
+  textInverse: '#FFFFFF',
+
+  border: '#E2E8F0',
+  borderSubtle: '#F0F9FF',
+  borderFocus: '#2563EB',
 
   statusPendiente: '#64748B',
   statusProceso: '#3B82F6',
@@ -413,8 +473,65 @@ const lightColors: ThemeColors = {
   prioMuyBaja: '#8B5CF6',
 
   navBg: '#FFFFFF',
-  navActiveBg: 'rgba(255, 94, 91, 0.12)',
-  navActiveColor: '#FF5E5B',
+  navActiveBg: 'rgba(37, 99, 235, 0.12)',
+  navActiveColor: '#2563EB',
+  navInactiveColor: '#94A3B8',
+};
+
+// ─── 8. LIGHT GREEN (Claro Verde Esmeralda) ──────────────────────────────────
+const lightGreenColors: ThemeColors = {
+  primary: '#059669', // Emerald Green
+  primaryLight: '#34D399',
+  primaryMuted: 'rgba(5, 150, 105, 0.12)',
+  accent: '#0284C7',
+  accentMuted: 'rgba(2, 132, 199, 0.12)',
+  mint: '#10B981',
+  mintMuted: 'rgba(16, 185, 129, 0.12)',
+  rose: '#EF4444',
+  roseMuted: 'rgba(239, 68, 68, 0.12)',
+  blueSoft: '#06B6D4',
+
+  success: '#10B981',
+  successMuted: 'rgba(16, 185, 129, 0.12)',
+  warning: '#F59E0B',
+  warningMuted: 'rgba(245, 158, 11, 0.12)',
+  danger: '#EF4444',
+  dangerMuted: 'rgba(239, 68, 68, 0.12)',
+  info: '#059669',
+
+  bgPrimary: '#F8FAFC',
+  bgSecondary: '#FFFFFF',
+  bgSurface: '#F0FDF4',
+  bgCard: '#FFFFFF',
+  bgCardElevated: '#FFFFFF',
+  bgModal: '#FFFFFF',
+  bgOverlay: 'rgba(15, 23, 42, 0.6)',
+
+  textPrimary: '#0F172A',
+  textSecondary: '#475569',
+  textMuted: '#94A3B8',
+  textInverse: '#FFFFFF',
+
+  border: '#E2E8F0',
+  borderSubtle: '#F0FDF4',
+  borderFocus: '#059669',
+
+  statusPendiente: '#64748B',
+  statusProceso: '#3B82F6',
+  statusRevision: '#F59E0B',
+  statusCompletada: '#10B981',
+  statusBloqueada: '#EF4444',
+  statusVencida: '#EF4444',
+
+  prioMuyAlta: '#EF4444',
+  prioAlta: '#F97316',
+  prioMedia: '#22C55E',
+  prioBaja: '#3B82F6',
+  prioMuyBaja: '#8B5CF6',
+
+  navBg: '#FFFFFF',
+  navActiveBg: 'rgba(5, 150, 105, 0.12)',
+  navActiveColor: '#059669',
   navInactiveColor: '#94A3B8',
 };
 
@@ -430,12 +547,36 @@ export interface ThemePresetOption {
 
 export const THEME_PRESETS: ThemePresetOption[] = [
   {
+    id: 'light_purple',
+    name: 'Claro Morado (Predeterminado)',
+    desc: 'Limpio y neutral con acentos violetas sofisticados',
+    bgHex: '#F8FAFC',
+    cardHex: '#FFFFFF',
+    primaryHex: '#7C3AED',
+  },
+  {
+    id: 'light_blue',
+    name: 'Claro Azul',
+    desc: 'Paleta clara corporativa con azul zafiro',
+    bgHex: '#F8FAFC',
+    cardHex: '#FFFFFF',
+    primaryHex: '#2563EB',
+  },
+  {
+    id: 'light_green',
+    name: 'Claro Verde Esmeralda',
+    desc: 'Fresco y equilibrado con verde bosque natural',
+    bgHex: '#F8FAFC',
+    cardHex: '#FFFFFF',
+    primaryHex: '#059669',
+  },
+  {
     id: 'asana_dark',
-    name: 'Asana Oscuro (Recomendado)',
-    desc: 'Carbón neutro mate sin morados molestos',
+    name: 'Asana Oscuro',
+    desc: 'Carbón neutro mate profesional',
     bgHex: '#1E1F21',
     cardHex: '#28292B',
-    primaryHex: '#FF5E5B',
+    primaryHex: '#8B5CF6',
   },
   {
     id: 'obsidian',
@@ -462,17 +603,9 @@ export const THEME_PRESETS: ThemePresetOption[] = [
     primaryHex: '#10B981',
   },
   {
-    id: 'light_clean',
-    name: 'Modo Claro',
-    desc: 'Luminoso, limpio y minimalista',
-    bgHex: '#F8FAFC',
-    cardHex: '#FFFFFF',
-    primaryHex: '#FF5E5B',
-  },
-  {
     id: 'iris_purple',
-    name: 'Morado Iris (Original)',
-    desc: 'Tema cósmico violeta clásico',
+    name: 'Iris Violeta Oscuro',
+    desc: 'Púrpura cósmico profundo',
     bgHex: '#0E1533',
     cardHex: '#1B1540',
     primaryHex: '#7C83FF',
@@ -496,10 +629,10 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  themeMode: 'dark',
-  themePreset: 'asana_dark',
-  isDark: true,
-  colors: asanaDarkColors,
+  themeMode: 'light',
+  themePreset: 'light_purple',
+  isDark: false,
+  colors: lightPurpleColors,
   setThemeMode: async () => {},
   setThemePreset: async () => {},
   toggleTheme: async () => {},
@@ -511,27 +644,41 @@ const ThemeContext = createContext<ThemeContextType>({
 
 const THEME_MODE_KEY = '@colab_theme_mode';
 const THEME_PRESET_KEY = '@colab_theme_preset';
+const THEME_V2_INIT_KEY = '@colab_theme_v2_light_default';
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const systemColorScheme = useColorScheme();
-  const [themeMode, setThemeModeState] = useState<ThemeMode>('dark');
-  const [themePreset, setThemePresetState] = useState<ThemePreset>('asana_dark');
+  const [themeMode, setThemeModeState] = useState<ThemeMode>('light');
+  const [themePreset, setThemePresetState] = useState<ThemePreset>('light_purple');
   const [bgType, setBgTypeState] = useState<BgType>('none');
   const [bgValue, setBgValueState] = useState<string | null>(null);
 
   useEffect(() => {
     const loadPreferences = async () => {
       try {
+        const isV2Init = await AsyncStorage.getItem(THEME_V2_INIT_KEY);
+        if (!isV2Init) {
+          // Guarantee Light Mode and light_purple preset are active by default
+          setThemeModeState('light');
+          setThemePresetState('light_purple');
+          await AsyncStorage.setItem(THEME_MODE_KEY, 'light');
+          await AsyncStorage.setItem(THEME_PRESET_KEY, 'light_purple');
+          await AsyncStorage.setItem(THEME_V2_INIT_KEY, 'true');
+          return;
+        }
+
         const savedMode = await AsyncStorage.getItem(THEME_MODE_KEY);
-        if (savedMode === 'dark' || savedMode === 'light' || savedMode === 'system') {
+        if (savedMode === 'light' || savedMode === 'dark' || savedMode === 'system') {
           setThemeModeState(savedMode as ThemeMode);
+        } else {
+          setThemeModeState('light');
         }
         const savedPreset = await AsyncStorage.getItem(THEME_PRESET_KEY);
         if (savedPreset && THEME_PRESETS.some((p) => p.id === savedPreset)) {
           setThemePresetState(savedPreset as ThemePreset);
         } else {
-          // Default to asana_dark
-          setThemePresetState('asana_dark');
+          // Default to light_purple
+          setThemePresetState('light_purple');
         }
 
         const savedBgType = await AsyncStorage.getItem('@colab_bg_type');
@@ -550,14 +697,25 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const isDark = useMemo(() => {
-    if (themePreset === 'light_clean') return false;
+    if (
+      themePreset === 'light_purple' ||
+      themePreset === 'light_blue' ||
+      themePreset === 'light_green' ||
+      themePreset === 'light_clean'
+    ) {
+      return false;
+    }
     if (themeMode === 'light') return false;
     if (themeMode === 'system') return systemColorScheme === 'dark';
     return true;
   }, [themeMode, themePreset, systemColorScheme]);
 
   const colors = useMemo<ThemeColors>(() => {
-    if (!isDark) return lightColors;
+    if (!isDark) {
+      if (themePreset === 'light_blue') return lightBlueColors;
+      if (themePreset === 'light_green') return lightGreenColors;
+      return lightPurpleColors;
+    }
 
     switch (themePreset) {
       case 'obsidian':
@@ -585,7 +743,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setThemePreset = async (preset: ThemePreset) => {
     setThemePresetState(preset);
-    if (preset === 'light_clean') {
+    const isLightPreset =
+      preset === 'light_purple' ||
+      preset === 'light_blue' ||
+      preset === 'light_green' ||
+      preset === 'light_clean';
+
+    if (isLightPreset) {
       setThemeModeState('light');
       await AsyncStorage.setItem(THEME_MODE_KEY, 'light');
     } else {
@@ -600,7 +764,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const toggleTheme = async () => {
-    const nextPreset: ThemePreset = isDark ? 'light_clean' : 'asana_dark';
+    const nextPreset: ThemePreset = isDark ? 'light_purple' : 'asana_dark';
     await setThemePreset(nextPreset);
   };
 

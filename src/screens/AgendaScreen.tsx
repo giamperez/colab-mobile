@@ -14,7 +14,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { agendaApi } from '../api/agenda.api';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { AppHeader } from '../components/AppHeader';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
 import { PRIORITY_LABELS, PRIORITY_COLORS } from '../types';
@@ -28,6 +28,7 @@ const SOURCE_OPTIONS = [
 ];
 
 export const AgendaScreen = () => {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
   const { colors, isDark } = useTheme();
@@ -77,7 +78,13 @@ export const AgendaScreen = () => {
         subtitle="Transforma notas y minutas en tareas estructuradas con IA"
       />
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: Math.max(insets.bottom, 8) + 85 },
+        ]}
+      >
         {/* Intro Card */}
         <View
           style={[
