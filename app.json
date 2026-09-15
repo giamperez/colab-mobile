@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Colab Mobile",
+    "name": "Colab",
     "slug": "comovamos-mobile",
     "platforms": [
       "ios",
@@ -10,11 +10,6 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "updates": {
       "fallbackToCacheTimeout": 0
     },
@@ -26,8 +21,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#FFFFFF"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#050A27"
       },
       "package": "com.comovamosmobile"
     },
@@ -40,9 +35,20 @@
         {
           "microphonePermission": "Colab necesita acceso al micrófono para transcribir lo que dictas.",
           "speechRecognitionPermission": "Colab necesita permiso de reconocimiento de voz para transcribir lo que dictas.",
-          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
         }
-      ]
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#050A27"
+        }
+      ],
+      "expo-status-bar"
     ],
     "extra": {
       "eas": {
