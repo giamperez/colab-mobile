@@ -122,6 +122,11 @@ export const mapTaskFromBackend = (rawTask: any): Task => {
     project_id: rawTask.project_id ?? rawTask.projectId ?? rawTask.project?.id ?? null,
     projectId: rawTask.project_id ?? rawTask.projectId ?? rawTask.project?.id ?? null,
     is_checked: !!rawTask.is_checked,
+    attachments: rawTask.adjuntos || rawTask.attachments || [],
+    adjuntos: rawTask.adjuntos || rawTask.attachments || [],
+    estado_previo: rawTask.estadoPrevio || rawTask.estado_previo || undefined,
+    estadoPrevio: rawTask.estadoPrevio || rawTask.estado_previo || undefined,
+    en_papelera: rawTask.en_papelera ?? (rawTask.estado === 'ELIMINADA' || rawTask.status === 'eliminada'),
     gantt_item: rawTask.gantt_item || rawTask.ganttItem,
     project: rawTask.project,
   };

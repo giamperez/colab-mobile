@@ -2,8 +2,13 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authEvents } from './authEvents';
 
+const globalProcess = (globalThis as any).process;
+const EXPO_PUBLIC_API_URL =
+  globalProcess?.env?.EXPO_PUBLIC_API_URL ||
+  'https://colab.vertexdev.tech/api';
+
 const client = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_URL || 'https://colab.vertexdev.tech/api',
+  baseURL: EXPO_PUBLIC_API_URL,
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 });

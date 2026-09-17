@@ -13,6 +13,7 @@ const CAT_POSE_IMAGES: Record<PetPose, number> = {
   pushing: require('../../assets/mascot/cat_pushing.png'),
   alert: require('../../assets/mascot/cat_alert.png'),
   celebrating: require('../../assets/mascot/cat_celebrating.png'),
+  listening: require('../../assets/mascot/cat_listening.png'),
 };
 
 // Base units kept from the previous procedural sprite (22 cols x 18 rows) so

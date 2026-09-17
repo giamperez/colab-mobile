@@ -274,14 +274,22 @@ export const IronManCelebrationOverlay: React.FC = () => {
 
 const styles = StyleSheet.create({
   fullOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     zIndex: 999999,
     elevation: 999999,
     alignItems: 'center',
     justifyContent: 'center',
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(5, 7, 14, 0.88)',
   },
   container: {

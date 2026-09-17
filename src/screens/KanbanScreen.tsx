@@ -30,6 +30,7 @@ import { TaskModal } from '../components/TaskModal';
 import { TaskDetailModal } from '../components/TaskDetailModal';
 import { TaskStatusModal } from '../components/TaskStatusModal';
 import { GanttModal } from '../components/GanttModal';
+import { TrashModal } from '../components/TrashModal';
 import { DraggableKanbanBoard, KANBAN_COLUMNS } from '../components/DraggableKanbanBoard';
 import { IronManGuide } from '../components/IronManGuide';
 import { AppHeader } from '../components/AppHeader';
@@ -74,7 +75,7 @@ export const KanbanScreen = () => {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { colors, isDark, bgType } = useTheme();
   const { user: currentUser, isSuperAdmin, isAdmin, isJefe, isColaborador, canForceDelete } = useAuth();
-  const { showError, showSuccess } = useNotification();
+  const { showError, showSuccess, showConfirm } = useNotification();
 
   // Mode: 'kanban' (default board) or 'list'
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
@@ -126,6 +127,7 @@ export const KanbanScreen = () => {
   const [createMenuVisible, setCreateMenuVisible] = useState(false);
   const [ganttModalVisible, setGanttModalVisible] = useState(false);
   const [editingGanttItem, setEditingGanttItem] = useState<GanttItem | null>(null);
+  const [trashModalVisible, setTrashModalVisible] = useState(false);
 
   // Data queries
   const { data: rawTasks, isLoading, refetch } = useQuery({
@@ -885,6 +887,15 @@ export const KanbanScreen = () => {
             {hasActiveFilters && <View style={styles.filterDot} />}
           </TouchableOpacity>
 
+          {/* Trash button */}
+          <TouchableOpacity
+            style={[styles.toolBtn, { backgroundColor: colors.dangerMuted }]}
+            onPress={() => setTrashModalVisible(true)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="trash-outline" size={17} color={colors.danger} />
+          </TouchableOpacity>
+
           {/* View mode switcher (Opens Asana "Elegir una vista" bottom sheet) */}
           <TouchableOpacity
             style={[styles.modeSwitcherBtn, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}
@@ -1036,6 +1047,7 @@ export const KanbanScreen = () => {
       )}
 
       {/* Quick Move Status Modal (For Kanban) */}
+      {/* Quick Actions & Move Status Modal (For Kanban Card '...' menu) */}
       {quickMoveTask && (
         <Modal visible={!!quickMoveTask} transparent animationType="fade" onRequestClose={() => setQuickMoveTask(null)}>
           <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setQuickMoveTask(null)}>
@@ -1050,10 +1062,77 @@ export const KanbanScreen = () => {
                 },
               ]}
             >
-              <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Mover Tarea</Text>
-              <Text style={[styles.sheetSub, { color: colors.textMuted }]}>{quickMoveTask.title || quickMoveTask.titulo}</Text>
+              <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Opciones de Tarea</Text>
+              <Text style={[styles.sheetSub, { color: colors.textMuted }]} numberOfLines={2}>
+                {quickMoveTask.title || quickMoveTask.titulo}
+              </Text>
 
               <ScrollView showsVerticalScrollIndicator={false}>
+                {/* 1. Direct Actions Row */}
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.sheetOptionBtn,
+                      { flex: 1, backgroundColor: colors.bgSurface, borderColor: colors.borderSubtle, justifyContent: 'center' },
+                    ]}
+                    onPress={() => {
+                      const t = quickMoveTask;
+                      setQuickMoveTask(null);
+                      setDetailTask(t);
+                      setDetailModalVisible(true);
+                    }}
+                  >
+                    <Ionicons name="eye-outline" size={16} color={colors.primary} />
+                    <Text style={[styles.sheetOptionText, { color: colors.textPrimary, fontSize: 13 }]}>Detalles</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.sheetOptionBtn,
+                      { flex: 1, backgroundColor: colors.bgSurface, borderColor: colors.borderSubtle, justifyContent: 'center' },
+                    ]}
+                    onPress={async () => {
+                      const id = quickMoveTask.id;
+                      setQuickMoveTask(null);
+                      await duplicateTaskMutation.mutateAsync(id);
+                      showSuccess('Tarea duplicada', 'Se creó una copia de la tarea.');
+                    }}
+                  >
+                    <Ionicons name="copy-outline" size={16} color={colors.textSecondary} />
+                    <Text style={[styles.sheetOptionText, { color: colors.textSecondary, fontSize: 13 }]}>Duplicar</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.sheetOptionBtn,
+                      { flex: 1, backgroundColor: colors.dangerMuted, borderColor: colors.danger, justifyContent: 'center' },
+                    ]}
+                    onPress={() => {
+                      const t = quickMoveTask;
+                      setQuickMoveTask(null);
+                      showConfirm({
+                        title: 'Mover a la Papelera',
+                        message: `¿Deseas enviar "${t.title || t.titulo}" a la papelera? Podrás recuperarla durante 30 días.`,
+                        confirmText: 'Mover a Papelera',
+                        isDestructive: true,
+                        icon: 'trash-outline',
+                        onConfirm: async () => {
+                          await deleteTaskMutation.mutateAsync(t.id);
+                          showSuccess('Tarea en Papelera', 'La tarea se movió a la papelera.');
+                        },
+                      });
+                    }}
+                  >
+                    <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                    <Text style={[styles.sheetOptionText, { color: colors.danger, fontSize: 13 }]}>Papelera</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* 2. Move Status Section */}
+                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.5, marginBottom: 8, textTransform: 'uppercase' }}>
+                  CAMBIAR ESTADO / COLUMNA
+                </Text>
+
                 <View style={styles.sheetOptions}>
                   {COLUMNS.map((col) => {
                     const isCurrent = quickMoveTask.status === col.id;
@@ -1098,6 +1177,7 @@ export const KanbanScreen = () => {
         groups={groups}
         projects={projects}
         onCategoryCreated={() => queryClient.invalidateQueries({ queryKey: ['categories-list'] })}
+        onProjectCreated={() => queryClient.invalidateQueries({ queryKey: ['projects-list'] })}
         onSave={async (taskData) => {
           if (editingTask) {
             await updateTaskMutation.mutateAsync({ id: editingTask.id, dto: taskData });
@@ -1375,6 +1455,12 @@ export const KanbanScreen = () => {
         onSubmit={async (data) => {
           await createGanttMutation.mutateAsync(data);
         }}
+      />
+
+      {/* Trash Modal (Papelera) */}
+      <TrashModal
+        visible={trashModalVisible}
+        onClose={() => setTrashModalVisible(false)}
       />
     </SafeAreaView>
   );

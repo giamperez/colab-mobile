@@ -31,6 +31,7 @@ export interface User {
   emoji?: string;
   group_id?: number | null;
   group_name?: string | null;
+  grupos?: Array<{ id?: number; groupId: number; esJefe?: boolean }>;
 }
 
 export interface GroupMember {
@@ -52,6 +53,7 @@ export interface Group {
   is_active?: boolean;
   createdAt?: string;
   companyId?: number;
+  miembros?: GroupMember[];
   _count?: { miembros: number };
 }
 
@@ -120,6 +122,21 @@ export interface TaskAssignee {
   };
 }
 
+export interface TaskAttachment {
+  id?: number | string;
+  url: string;
+  nombre: string;
+  tipo?: string;
+  size?: number;
+  content?: string;
+  createdAt?: string;
+  user?: {
+    id: number;
+    nombre?: string;
+    avatarUrl?: string;
+  };
+}
+
 export interface Task {
   id: number;
   title: string;
@@ -130,6 +147,9 @@ export interface Task {
   prioridad?: string;
   status: TaskStatus;
   estado?: string;
+  estado_previo?: string;
+  estadoPrevio?: string;
+  en_papelera?: boolean;
   progress?: number;
   execution_date: string;
   fechaInicio?: string;
@@ -164,6 +184,13 @@ export interface Task {
   project_id?: number | null;
   projectId?: number | null;
   is_checked?: boolean;
+  attachments?: TaskAttachment[];
+  adjuntos?: TaskAttachment[];
+  updatedAt?: string;
+  updated_at?: string;
+  createdAt?: string;
+  created_at?: string;
+  deletedAt?: string;
   gantt_item?: {
     id: number;
     title: string;
@@ -173,6 +200,7 @@ export interface Task {
     id: number;
     name?: string;
     nombre?: string;
+    color?: string;
   };
 }
 
@@ -181,6 +209,27 @@ export interface Project {
   name?: string;
   nombre?: string;
   color?: string;
+  description?: string;
+  descripcion?: string;
+  fechaInicio?: string;
+  startDate?: string;
+  fechaFin?: string;
+  endDate?: string;
+  estado?: string;
+  status?: string;
+  en_papelera?: boolean;
+  deletedAt?: string;
+  updatedAt?: string;
+  createdAt?: string;
+  _count?: { tasks: number };
+  tasks?: Array<{
+    id: number;
+    titulo?: string;
+    title?: string;
+    estado?: string;
+    status?: string;
+    estadoPrevio?: string;
+  }>;
 }
 
 export interface GanttSubtask {

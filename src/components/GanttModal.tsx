@@ -56,13 +56,13 @@ export const GanttModal: React.FC<GanttModalProps> = ({
 
   useEffect(() => {
     if (initialItem) {
-      setTitle(initialItem.title || '');
-      setDescription(initialItem.description || '');
-      setType(initialItem.type || 'lanzamiento');
+      setTitle(initialItem.title || initialItem.nombre || (initialItem as any).name || (initialItem as any).titulo || '');
+      setDescription(initialItem.description || initialItem.descripcion || '');
+      setType(initialItem.type || (initialItem as any).tipo || 'lanzamiento');
       setColor(initialItem.color || '#7C83FF');
-      setStartDate(initialItem.start_date ? initialItem.start_date.split('T')[0] : new Date().toISOString().split('T')[0]);
-      setEndDate(initialItem.end_date ? initialItem.end_date.split('T')[0] : new Date().toISOString().split('T')[0]);
-      setGroupId(initialItem.group_id || null);
+      setStartDate(initialItem.start_date ? initialItem.start_date.split('T')[0] : (initialItem.fechaInicio ? initialItem.fechaInicio.split('T')[0] : new Date().toISOString().split('T')[0]));
+      setEndDate(initialItem.end_date ? initialItem.end_date.split('T')[0] : (initialItem.fechaFin ? initialItem.fechaFin.split('T')[0] : new Date().toISOString().split('T')[0]));
+      setGroupId(initialItem.group_id || (initialItem as any).groupId || null);
     } else {
       setTitle('');
       setDescription('');
@@ -85,7 +85,15 @@ export const GanttModal: React.FC<GanttModalProps> = ({
 
   const handleSubmit = async () => {
     if (!title.trim()) {
-      Alert.alert('Error', 'El título del proyecto Gantt es obligatorio');
+      Alert.alert('Error', 'El título del proyecto es obligatorio');
+      return;
+    }
+    if (!startDate || !endDate) {
+      Alert.alert('Error', 'Las fechas de inicio y fin son obligatorias');
+      return;
+    }
+    if (endDate < startDate) {
+      Alert.alert('Error', 'La fecha de fin no puede ser anterior a la fecha de inicio');
       return;
     }
     setLoading(true);

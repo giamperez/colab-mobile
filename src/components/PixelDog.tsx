@@ -4,7 +4,7 @@ import { PixelPetSpriteSvg } from './PixelPetSpriteSvg';
 import { PetColorwayId } from './petColorways';
 import { DOG_COLORWAY_FILTERS } from './mascotColorFilters';
 
-export type PetPose = 'flying' | 'sleeping' | 'pointing' | 'grabbing' | 'pushing' | 'alert' | 'celebrating';
+export type PetPose = 'flying' | 'sleeping' | 'pointing' | 'grabbing' | 'pushing' | 'alert' | 'celebrating' | 'listening';
 
 const DOG_POSE_IMAGES: Record<PetPose, number> = {
   flying: require('../../assets/mascot/dog_flying.png'),
@@ -14,6 +14,7 @@ const DOG_POSE_IMAGES: Record<PetPose, number> = {
   pushing: require('../../assets/mascot/dog_pushing.png'),
   alert: require('../../assets/mascot/dog_alert.png'),
   celebrating: require('../../assets/mascot/dog_celebrating.png'),
+  listening: require('../../assets/mascot/dog_listening.png'),
 };
 
 // Base units kept from the previous procedural sprite (22 cols x 20 rows) so

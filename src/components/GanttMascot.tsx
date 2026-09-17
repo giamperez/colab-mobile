@@ -33,7 +33,7 @@ const CARD_WIDTH = 220;
 
 const getStart = (item: GanttItem) => item.start_date || item.fechaInicio;
 const getEnd = (item: GanttItem) => item.end_date || item.fechaFin;
-const getTitle = (item: GanttItem) => item.title || item.nombre || `Plan #${item.id}`;
+const getTitle = (item: GanttItem) => (item as any).name || item.nombre || item.title || (item as any).titulo || `Plan #${item.id}`;
 const getProgress = (item: GanttItem) =>
   typeof item.progress === 'number' ? item.progress : item.progreso ?? 0;
 const isClosed = (item: GanttItem) => {
@@ -222,7 +222,7 @@ export const GanttMascot: React.FC<GanttMascotProps> = ({ items = [] }) => {
       {isOpen && (
         <>
           <TouchableOpacity
-            style={[StyleSheet.absoluteFillObject, styles.backdrop]}
+            style={[StyleSheet.absoluteFill, styles.backdrop]}
             activeOpacity={1}
             onPress={closeTooltip}
           />

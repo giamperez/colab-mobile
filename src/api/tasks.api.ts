@@ -34,7 +34,7 @@ export const tasksApi = {
     }),
 
   getCalendarTasks: (from: string, to: string) =>
-    client.get('/tasks', { params: { from, to } }).then((res) => {
+    client.get('/tasks/calendar', { params: { from, to } }).then((res) => {
       const raw = Array.isArray(res.data) ? res.data : res.data?.data || [];
       return { ...res, data: deduplicateTasksById(raw.map(mapTaskFromBackend) as Task[]) };
     }),
@@ -55,6 +55,7 @@ export const tasksApi = {
     const group_id = data.group_id || data.groupId || data.group?.id || undefined;
     const gantt_item_id = data.gantt_item_id || data.ganttItemId || undefined;
     const project_id = data.project_id || data.projectId || undefined;
+    const attachments = data.attachments || data.adjuntos || undefined;
 
     // Dates formatted YYYY-MM-DD using local time
     const todayLocal = dayjs().format('YYYY-MM-DD');
@@ -98,6 +99,7 @@ export const tasksApi = {
       due_date: dueDate,
       priority: prioRaw,
       status: statusRaw,
+      attachments,
 
       // Backend NestJS DTO fields (Spanish)
       titulo: title,
@@ -111,6 +113,7 @@ export const tasksApi = {
       fechaVencimiento: dueDate,
       prioridad: prioridadEnum,
       estado: estadoEnum,
+      adjuntos: attachments,
     };
     return client.post('/tasks', payload).then((res) => ({ ...res, data: mapTaskFromBackend(res.data) }));
   },
@@ -128,6 +131,10 @@ export const tasksApi = {
     }
     if (data.assignee_id && !data.responsableId) {
       payload.responsableId = data.assignee_id;
+    }
+    if (data.attachments || data.adjuntos) {
+      payload.attachments = data.attachments || data.adjuntos;
+      payload.adjuntos = data.attachments || data.adjuntos;
     }
     if (data.status) {
       const clean = String(data.status).toLowerCase();
@@ -196,14 +203,14 @@ export const tasksApi = {
 
   remove: (id: number) => client.delete(`/tasks/${id}`),
 
-  restore: (id: number) => client.patch(`/tasks/${id}`, { is_active: true }),
+  restore: (id: number) => client.patch(`/tasks/${id}/restore`),
 
-  forceDelete: (id: number) => client.delete(`/tasks/${id}`),
+  forceDelete: (id: number) => client.delete(`/tasks/${id}/force`),
 
   getTrash: () =>
-    client.get('/tasks', { params: { is_active: false } }).then((res) => {
+    client.get('/tasks', { params: { estado: 'ELIMINADA', includeDeleted: 'true' } }).then((res) => {
       const raw = Array.isArray(res.data) ? res.data : res.data?.data || [];
-      return { ...res, data: raw.map(mapTaskFromBackend) as Task[] };
+      return { ...res, data: deduplicateTasksById(raw.map(mapTaskFromBackend) as Task[]) };
     }),
 
   duplicate: async (id: number) => {

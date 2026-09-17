@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Linking,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -357,15 +359,15 @@ export const TaskDetailModal = ({
             </View>
 
             {/* Proyecto Gantt o Área */}
-            {(task.gantt_item || task.group || task.groupNombre) ? (
+            {(task.gantt_item || task.project || task.group || task.groupNombre) ? (
               <View style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>ASOCIACIONES</Text>
-                {task.gantt_item && (
+                {(task.project || task.gantt_item) && (
                   <View style={styles.infoRow}>
                     <Ionicons name="layers-outline" size={16} color={colors.primary} />
                     <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Proyecto:</Text>
                     <Text style={[styles.infoValue, { color: colors.primary, fontWeight: '700' }]}>
-                      {task.gantt_item.title}
+                      {task.project?.nombre || task.project?.name || task.gantt_item?.title || 'Proyecto'}
                     </Text>
                   </View>
                 )}
@@ -380,6 +382,50 @@ export const TaskDetailModal = ({
                 )}
               </View>
             ) : null}
+
+            {/* Adjuntos / Multimedia */}
+            {((task.attachments && task.attachments.length > 0) || (task.adjuntos && task.adjuntos.length > 0)) && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+                  ADJUNTOS / MULTIMEDIA ({((task.attachments || task.adjuntos)?.length) || 0})
+                </Text>
+                <View style={styles.attachmentsContainer}>
+                  {(task.attachments || task.adjuntos || []).map((att, idx) => {
+                    const isImg = att.tipo === 'IMAGE' || /\.(jpeg|jpg|png|webp|gif)$/i.test(att.url);
+                    return (
+                      <TouchableOpacity
+                        key={att.id || idx}
+                        style={[styles.attachmentCard, { backgroundColor: colors.bgSurface, borderColor: colors.border }]}
+                        onPress={() => {
+                          if (att.url) {
+                            Linking.openURL(att.url).catch(() => {
+                              Alert.alert('Error', 'No se pudo abrir el archivo o enlace.');
+                            });
+                          }
+                        }}
+                      >
+                        {isImg ? (
+                          <Image source={{ uri: att.url }} style={styles.attachmentThumb} />
+                        ) : (
+                          <View style={[styles.attIconBox, { backgroundColor: colors.primaryMuted }]}>
+                            <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+                          </View>
+                        )}
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.attachmentTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                            {att.nombre || 'Archivo adjunto'}
+                          </Text>
+                          <Text style={[styles.attachmentLink, { color: colors.primary }]} numberOfLines={1}>
+                            Toca para ver o descargar
+                          </Text>
+                        </View>
+                        <Ionicons name="open-outline" size={16} color={colors.textMuted} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
           </ScrollView>
 
           {/* Footer Actions */}
@@ -408,27 +454,23 @@ export const TaskDetailModal = ({
             </View>
           ) : (
             <View style={[styles.footer, { borderTopColor: colors.borderSubtle }]}>
-              {(isAdmin || isJefe || isSuperAdmin) && (
-                <>
-                  <TouchableOpacity
-                    style={[styles.actionBtnSecondary, { flex: 1, justifyContent: 'center', backgroundColor: colors.bgSurface }]}
-                    onPress={() => {
-                      if (onDuplicate) onDuplicate(task.id);
-                      onClose();
-                    }}
-                  >
-                    <Ionicons name="copy-outline" size={18} color={colors.textSecondary} />
-                    <Text style={[styles.actionBtnTextSec, { color: colors.textSecondary }]} numberOfLines={1}>Duplicar</Text>
-                  </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtnSecondary, { flex: 1, justifyContent: 'center', backgroundColor: colors.bgSurface }]}
+                onPress={() => {
+                  if (onDuplicate) onDuplicate(task.id);
+                  onClose();
+                }}
+              >
+                <Ionicons name="copy-outline" size={18} color={colors.textSecondary} />
+                <Text style={[styles.actionBtnTextSec, { color: colors.textSecondary }]} numberOfLines={1}>Duplicar</Text>
+              </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[styles.actionBtnDanger, { backgroundColor: colors.dangerMuted, borderColor: colors.danger }]}
-                    onPress={handleDeletePrompt}
-                  >
-                    <Ionicons name="trash-outline" size={18} color={colors.danger} />
-                  </TouchableOpacity>
-                </>
-              )}
+              <TouchableOpacity
+                style={[styles.actionBtnDanger, { backgroundColor: colors.dangerMuted, borderColor: colors.danger }]}
+                onPress={handleDeletePrompt}
+              >
+                <Ionicons name="trash-outline" size={18} color={colors.danger} />
+              </TouchableOpacity>
 
               <TouchableOpacity
                 style={[
@@ -685,6 +727,39 @@ const styles = StyleSheet.create({
     color: '#E11D48',
     fontWeight: '600',
     lineHeight: 16,
+  },
+  attachmentsContainer: {
+    gap: 8,
+    marginTop: 4,
+  },
+  attachmentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 10,
+  },
+  attachmentThumb: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+  },
+  attIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachmentTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  attachmentLink: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
   },
 });
 

@@ -937,6 +937,7 @@ export const GanttScreen = () => {
         initialStartDate={selectedGanttForTask?.start_date || (selectedGanttForTask as any)?.startDate}
         initialDueDate={selectedGanttForTask?.end_date || (selectedGanttForTask as any)?.endDate}
         onCategoryCreated={() => queryClient.invalidateQueries({ queryKey: ['categories-list'] })}
+        onProjectCreated={() => queryClient.invalidateQueries({ queryKey: ['projects-list'] })}
         onSave={async (taskData) => {
           if (editingTask) {
             await updateTaskMutation.mutateAsync({ id: editingTask.id, data: taskData });

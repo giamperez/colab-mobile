@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { NavigationContainer, DefaultTheme, DarkTheme, useNavigationState } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
@@ -44,6 +44,12 @@ const Stack = createNativeStackNavigator();
 const NavigationContent = () => {
   const { token, isLoading } = useAuth();
   const { colors, isDark, bgType } = useTheme();
+  const navigationRef = useNavigationContainerRef();
+  const [currentRouteName, setCurrentRouteName] = React.useState<string | null>(null);
+
+  const syncCurrentRoute = () => {
+    setCurrentRouteName((navigationRef.getCurrentRoute() as { name: string } | undefined)?.name ?? null);
+  };
 
   const navigationTheme = {
     ...(isDark ? DarkTheme : DefaultTheme),
@@ -74,8 +80,13 @@ const NavigationContent = () => {
 
   return (
     <AppBackground>
-      <NavigationContainer theme={navigationTheme}>
-        <StatusBar style={isDark ? 'light' : 'dark'} backgroundColor={colors.bgSecondary} />
+      <NavigationContainer
+        ref={navigationRef}
+        theme={navigationTheme}
+        onReady={syncCurrentRoute}
+        onStateChange={syncCurrentRoute}
+      >
+        <StatusBar style={isDark ? 'light' : 'dark'} />
         <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
           {!token ? (
             <>
@@ -101,7 +112,7 @@ const NavigationContent = () => {
           )}
         </Stack.Navigator>
         {/* Global Mascot — visible on every authenticated screen except Kanban (which has its own with task data) */}
-        <GlobalMascotOverlay isAuthenticated={!!token} />
+        <GlobalMascotOverlay isAuthenticated={!!token} routeName={currentRouteName} />
         {/* Global Iron Man Task Completion Animation */}
         <IronManCelebrationOverlay />
       </NavigationContainer>
@@ -116,13 +127,11 @@ const NavigationContent = () => {
  */
 const SCREENS_WITHOUT_MASCOT = ['Kanban', 'Login', 'Register'];
 
-const GlobalMascotOverlay: React.FC<{ isAuthenticated: boolean }> = ({ isAuthenticated }) => {
+const GlobalMascotOverlay: React.FC<{ isAuthenticated: boolean; routeName: string | null }> = ({
+  isAuthenticated,
+  routeName,
+}) => {
   const { user } = useAuth();
-  // Get the name of the currently focused route
-  const routeName = useNavigationState((state) => {
-    if (!state || !state.routes || state.routes.length === 0) return null;
-    return state.routes[state.index]?.name ?? null;
-  });
 
   if (!isAuthenticated || !routeName || SCREENS_WITHOUT_MASCOT.includes(routeName)) {
     return null;

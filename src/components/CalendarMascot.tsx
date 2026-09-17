@@ -212,7 +212,7 @@ export const CalendarMascot: React.FC<CalendarMascotProps> = ({ tasks, userId })
       {isOpen && (
         <>
           <TouchableOpacity
-            style={[StyleSheet.absoluteFillObject, styles.backdrop]}
+            style={[StyleSheet.absoluteFill, styles.backdrop]}
             activeOpacity={1}
             onPress={closeTooltip}
           />

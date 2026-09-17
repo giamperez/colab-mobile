@@ -1126,7 +1126,11 @@ export const DraggableKanbanBoard = ({
 const bStyles = StyleSheet.create({
   root: { flex: 1, position: 'relative' },
   overlayContainer: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     zIndex: 99999,
     elevation: 99,
   },

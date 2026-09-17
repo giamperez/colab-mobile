@@ -16,6 +16,7 @@ import { categoriesApi } from '../api/categories.api';
 import { ganttApi } from '../api/gantt.api';
 import { groupsApi } from '../api/groups.api';
 import { usersApi } from '../api/users.api';
+import { projectsApi } from '../api/projects.api';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { AppHeader } from '../components/AppHeader';
 import { TaskDetailModal } from '../components/TaskDetailModal';
@@ -98,10 +99,16 @@ export const DashboardScreen = () => {
     queryFn: () => groupsApi.getAll().then((res) => res.data),
   });
 
+  const { data: rawProjects } = useQuery({
+    queryKey: ['projects-list-dash'],
+    queryFn: () => projectsApi.getAll().then((res) => res.data),
+  });
+
   const users: User[] = extractArray<User>(rawUsers);
   const categories = extractArray<any>(rawCategories);
   const ganttItems = extractArray<any>(rawGantt);
   const groups = extractArray<any>(rawGroups);
+  const projects = extractArray<any>(rawProjects);
 
   // Mutations
   const createTaskMutation = useMutation({
@@ -615,6 +622,9 @@ export const DashboardScreen = () => {
         categories={categories}
         ganttItems={ganttItems}
         groups={groups}
+        projects={projects}
+        onCategoryCreated={() => queryClient.invalidateQueries({ queryKey: ['categories-list-dash'] })}
+        onProjectCreated={() => queryClient.invalidateQueries({ queryKey: ['projects-list-dash'] })}
         onSave={async (taskData) => {
           if (editingTask) {
             await updateTaskMutation.mutateAsync({ id: editingTask.id, data: taskData });

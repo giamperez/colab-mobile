@@ -302,7 +302,7 @@ export const IronManGuide: React.FC<IronManGuideProps> = ({
         <>
           {/* Invisible tap-anywhere-to-close layer — zIndex 150 puts it above ScrollView items */}
           <TouchableOpacity
-            style={[StyleSheet.absoluteFillObject, styles.backdrop]}
+            style={[StyleSheet.absoluteFill, styles.backdrop]}
             activeOpacity={1}
             onPress={closeTooltip}
           />

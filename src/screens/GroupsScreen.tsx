@@ -19,6 +19,7 @@ import { AppHeader } from '../components/AppHeader';
 import { GroupModal } from '../components/GroupModal';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useNotification } from '../context/NotificationContext';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Group, User, GroupMember } from '../types';
 
@@ -27,6 +28,7 @@ export const GroupsScreen = () => {
   const queryClient = useQueryClient();
   const { colors, isDark } = useTheme();
   const { isAdmin } = useAuth();
+  const { showSuccess, showError, showConfirm } = useNotification();
   const [modalVisible, setModalVisible] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [expandedGroupId, setExpandedGroupId] = useState<number | null>(null);
@@ -44,12 +46,90 @@ export const GroupsScreen = () => {
   const groups: Group[] = extractArray<Group>(rawGroups);
   const users: User[] = extractArray<User>(rawUsers);
 
+  // Helper to extract all members of a group seamlessly:
+  const getGroupMembers = (item: Group, allUsers: User[]): Array<{ user: User; esJefe: boolean }> => {
+    const membersMap = new Map<number, { user: User; esJefe: boolean }>();
+
+    // 1. From item.miembros or item.members or item.users or item.usuarios
+    const groupMiembros =
+      (item as any).miembros ||
+      (item as any).members ||
+      (item as any).users ||
+      (item as any).usuarios ||
+      (item as any).groupMembers ||
+      [];
+    if (Array.isArray(groupMiembros) && groupMiembros.length > 0) {
+      groupMiembros.forEach((m: any) => {
+        const u =
+          m.user ||
+          m.usuario ||
+          allUsers.find((usr) => usr.id === (m.userId || m.user_id || m.id)) ||
+          (m.id && (m.email || m.nombre || m.name) ? m : null);
+        if (u && u.id) {
+          membersMap.set(u.id, {
+            user: u,
+            esJefe:
+              !!m.esJefe ||
+              !!m.es_jefe ||
+              u.rol === 'JEFE' ||
+              u.role === 'jefe' ||
+              (u.rol as string)?.toLowerCase() === 'jefe',
+          });
+        }
+      });
+    }
+
+    // 2. From allUsers matching u.grupos or u.group_id or u.groupId or u.group?.id or u.group_name or u.miembros
+    allUsers.forEach((u: any) => {
+      const isDirectGroup =
+        u.group_id === item.id ||
+        u.groupId === item.id ||
+        u.group?.id === item.id ||
+        (u.group_name &&
+          (item.name || item.nombre) &&
+          u.group_name.trim().toLowerCase() === (item.name || item.nombre)?.trim().toLowerCase());
+
+      const isGruposMember =
+        Array.isArray(u.grupos) &&
+        u.grupos.some((ug: any) => ug.groupId === item.id || ug.group_id === item.id || ug.id === item.id);
+      const isMembershipsMember =
+        Array.isArray(u.memberships) &&
+        u.memberships.some((ug: any) => ug.groupId === item.id || ug.group_id === item.id);
+      const isMiembrosMember =
+        Array.isArray(u.miembros) &&
+        u.miembros.some((ug: any) => ug.groupId === item.id || ug.group_id === item.id);
+
+      if (isDirectGroup || isGruposMember || isMembershipsMember || isMiembrosMember) {
+        if (!membersMap.has(u.id)) {
+          const ugMatch = Array.isArray(u.grupos)
+            ? u.grupos.find((ug: any) => ug.groupId === item.id || ug.group_id === item.id || ug.id === item.id)
+            : null;
+          membersMap.set(u.id, {
+            user: u,
+            esJefe:
+              !!ugMatch?.esJefe ||
+              !!ugMatch?.es_jefe ||
+              u.rol === 'JEFE' ||
+              u.role === 'jefe' ||
+              (u.rol as string)?.toLowerCase() === 'jefe',
+          });
+        }
+      }
+    });
+
+    return Array.from(membersMap.values());
+  };
+
   // Mutations
   const createGroupMutation = useMutation({
     mutationFn: (data: any) => groupsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['groups-list-screen'] });
       queryClient.invalidateQueries({ queryKey: ['groups-list'] });
+      showSuccess('Grupo Creado', 'El departamento ha sido registrado con éxito.');
+    },
+    onError: (err: any) => {
+      showError('Error', err.response?.data?.message || 'No se pudo crear el grupo.');
     },
   });
 
@@ -58,6 +138,10 @@ export const GroupsScreen = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['groups-list-screen'] });
       queryClient.invalidateQueries({ queryKey: ['groups-list'] });
+      showSuccess('Grupo Actualizado', 'Los cambios se han guardado con éxito.');
+    },
+    onError: (err: any) => {
+      showError('Error', err.response?.data?.message || 'No se pudo actualizar el grupo.');
     },
   });
 
@@ -66,19 +150,58 @@ export const GroupsScreen = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['groups-list-screen'] });
       queryClient.invalidateQueries({ queryKey: ['groups-list'] });
+      showSuccess('Grupo Eliminado', 'El grupo fue eliminado correctamente.');
+    },
+    onError: (err: any) => {
+      showError('Error', err.response?.data?.message || 'No se pudo eliminar el grupo.');
     },
   });
 
-  const updateUserGroupMutation = useMutation({
-    mutationFn: ({ userId, data }: { userId: number; data: any }) => usersApi.update(userId, data),
+  const addMemberMutation = useMutation({
+    mutationFn: ({ groupId, userId, esJefe = false }: { groupId: number; userId: number; esJefe?: boolean }) =>
+      groupsApi.addMember(groupId, { userId, esJefe }),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['groups-list-screen'] });
+      queryClient.invalidateQueries({ queryKey: ['groups-list'] });
       queryClient.invalidateQueries({ queryKey: ['users-list-for-groups'] });
-      queryClient.invalidateQueries({ queryKey: ['users-list-screen'] });
+      showSuccess('Miembro Agregado', 'El colaborador ha sido incorporado al equipo.');
+    },
+    onError: (err: any) => {
+      showError('Error', err.response?.data?.message || 'No se pudo agregar al miembro.');
     },
   });
 
-  const handleAddMemberPrompt = (groupId: number) => {
-    const availableUsers = users.filter((u) => u.group_id !== groupId);
+  const removeMemberMutation = useMutation({
+    mutationFn: ({ groupId, userId }: { groupId: number; userId: number }) =>
+      groupsApi.removeMember(groupId, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['groups-list-screen'] });
+      queryClient.invalidateQueries({ queryKey: ['groups-list'] });
+      queryClient.invalidateQueries({ queryKey: ['users-list-for-groups'] });
+      showSuccess('Miembro Removido', 'El colaborador ya no forma parte de este grupo.');
+    },
+    onError: (err: any) => {
+      showError('Error', err.response?.data?.message || 'No se pudo remover al miembro.');
+    },
+  });
+
+  const toggleJefeMutation = useMutation({
+    mutationFn: ({ groupId, userId, esJefe }: { groupId: number; userId: number; esJefe: boolean }) =>
+      groupsApi.updateMember(groupId, userId, { esJefe }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['groups-list-screen'] });
+      queryClient.invalidateQueries({ queryKey: ['groups-list'] });
+      queryClient.invalidateQueries({ queryKey: ['users-list-for-groups'] });
+      showSuccess('Rol Actualizado', 'Se actualizó el rol en el equipo.');
+    },
+    onError: (err: any) => {
+      showError('Error', err.response?.data?.message || 'No se pudo actualizar el rol.');
+    },
+  });
+
+  const handleAddMemberPrompt = (item: Group) => {
+    const currentMemberIds = new Set(getGroupMembers(item, users).map((m) => m.user.id));
+    const availableUsers = users.filter((u) => !currentMemberIds.has(u.id));
 
     if (availableUsers.length === 0) {
       Alert.alert('Información', 'Todos los colaboradores ya forman parte de este grupo.');
@@ -92,7 +215,7 @@ export const GroupsScreen = () => {
         { text: 'Cancelar', style: 'cancel' },
         ...availableUsers.slice(0, 8).map((u) => ({
           text: `${u.emoji || '👤'} ${u.nombre || u.name || 'Usuario'}`,
-          onPress: () => updateUserGroupMutation.mutate({ userId: u.id, data: { group_id: groupId } }),
+          onPress: () => addMemberMutation.mutate({ groupId: item.id, userId: u.id, esJefe: false }),
         })),
       ]
     );
@@ -161,7 +284,16 @@ export const GroupsScreen = () => {
             </View>
           }
           renderItem={({ item }) => {
-            const groupMembers = users.filter((u) => u.group_id === item.id);
+            const groupMembers = getGroupMembers(item, users);
+            const countFromApi =
+              item._count?.miembros ??
+              (item as any)._count?.users ??
+              (item as any)._count?.usuarios ??
+              (item as any)._count?.members ??
+              (item as any).totalMembers ??
+              (item as any).memberCount ??
+              (item as any).total_miembros;
+            const memberCount = Math.max(groupMembers.length, typeof countFromApi === 'number' ? countFromApi : 0);
             const isExpanded = expandedGroupId === item.id;
             const groupColor = item.color || colors.primary;
 
@@ -192,7 +324,7 @@ export const GroupsScreen = () => {
                       </Text>
                     ) : null}
                     <Text style={[styles.memberCount, { color: colors.primary }]}>
-                      {groupMembers.length} miembros
+                      {memberCount} {memberCount === 1 ? 'miembro' : 'miembros'}
                     </Text>
                   </View>
 
@@ -235,11 +367,11 @@ export const GroupsScreen = () => {
                     ]}
                   >
                     <View style={styles.membersHeader}>
-                      <Text style={[styles.membersTitle, { color: colors.textSecondary }]}>Integrantes del Grupo</Text>
+                      <Text style={[styles.membersTitle, { color: colors.textSecondary }]}>Integrantes del Grupo ({groupMembers.length})</Text>
                       {isAdmin && (
                         <TouchableOpacity
                           style={[styles.addMemberBtn, { backgroundColor: colors.primaryMuted }]}
-                          onPress={() => handleAddMemberPrompt(item.id)}
+                          onPress={() => handleAddMemberPrompt(item)}
                         >
                           <Ionicons name="person-add-outline" size={14} color={colors.primary} />
                           <Text style={[styles.addMemberBtnText, { color: colors.primary }]}>Agregar</Text>
@@ -253,8 +385,7 @@ export const GroupsScreen = () => {
                       </Text>
                     ) : (
                       <View style={styles.membersList}>
-                        {groupMembers.map((mUser) => {
-                          const isJefe = mUser.role === 'jefe' || mUser.rol === 'JEFE';
+                        {groupMembers.map(({ user: mUser, esJefe }) => {
                           return (
                             <View
                               key={mUser.id}
@@ -277,14 +408,14 @@ export const GroupsScreen = () => {
                                 ]}
                               >
                                 <Text style={[styles.memberAvatarText, { color: colors.primary }]}>
-                                  {mUser.emoji || (mUser.nombre || mUser.name || mUser.email || 'U')[0]}
+                                  {mUser.emoji || (mUser.nombre || mUser.name || mUser.email || 'U')[0].toUpperCase()}
                                 </Text>
                               </View>
                               <View style={{ flex: 1 }}>
                                 <Text style={[styles.memberRowName, { color: colors.textPrimary }]}>
                                   {mUser.nombre || mUser.name || mUser.email || 'Colaborador'}
                                 </Text>
-                                {isJefe && (
+                                {esJefe && (
                                   <View style={styles.jefeBadge}>
                                     <Ionicons name="star" size={10} color="#F59E0B" />
                                     <Text style={styles.jefeBadgeText}>Líder / Jefe de Grupo</Text>
@@ -297,25 +428,26 @@ export const GroupsScreen = () => {
                                   <TouchableOpacity
                                     style={styles.jefeToggleBtn}
                                     onPress={() =>
-                                      updateUserGroupMutation.mutate({
+                                      toggleJefeMutation.mutate({
+                                        groupId: item.id,
                                         userId: mUser.id,
-                                        data: { role: isJefe ? 'usuario' : 'jefe' },
+                                        esJefe: !esJefe,
                                       })
                                     }
                                   >
                                     <Ionicons
-                                      name={isJefe ? 'star' : 'star-outline'}
+                                      name={esJefe ? 'star' : 'star-outline'}
                                       size={18}
-                                      color={isJefe ? '#F59E0B' : colors.textMuted}
+                                      color={esJefe ? '#F59E0B' : colors.textMuted}
                                     />
                                   </TouchableOpacity>
 
                                   <TouchableOpacity
                                     style={[styles.removeMemberBtn, { backgroundColor: colors.dangerMuted }]}
                                     onPress={() =>
-                                      updateUserGroupMutation.mutate({
+                                      removeMemberMutation.mutate({
+                                        groupId: item.id,
                                         userId: mUser.id,
-                                        data: { group_id: null },
                                       })
                                     }
                                   >

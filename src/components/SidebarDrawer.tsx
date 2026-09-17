@@ -18,9 +18,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 interface SidebarDrawerProps {
   visible: boolean;
   onClose: () => void;
+  onOpenTrash?: () => void;
 }
 
-export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({ visible, onClose }) => {
+export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({ visible, onClose, onOpenTrash }) => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
@@ -31,10 +32,18 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({ visible, onClose }
   const isSuperAdmin = user?.rol === 'SUPERADMIN' || user?.rol === 'superadmin';
   const isAdmin = isSuperAdmin || user?.rol === 'ADMIN' || user?.rol === 'admin';
 
-  const navigateTo = (screenName: string) => {
+  const navigateTo = (item: any) => {
     onClose();
+    if (item.isTrash) {
+      if (onOpenTrash) {
+        setTimeout(() => {
+          onOpenTrash();
+        }, 200);
+      }
+      return;
+    }
     setTimeout(() => {
-      navigation.navigate(screenName);
+      navigation.navigate(item.screen);
     }, 150);
   };
 
@@ -53,6 +62,7 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({ visible, onClose }
       items: [
         { label: 'Grupos & Áreas', screen: 'Groups', icon: 'people-outline' },
         { label: 'Directorio de Usuarios', screen: 'Users', icon: 'person-outline' },
+        { label: 'Papelera de Reciclaje (30d)', screen: 'Trash', icon: 'trash-outline', isTrash: true },
         { label: 'Reportes & Exportar', screen: 'Reports', icon: 'document-text-outline' },
       ],
     },

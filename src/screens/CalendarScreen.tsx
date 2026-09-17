@@ -806,6 +806,7 @@ export const CalendarScreen = () => {
         groups={groups}
         projects={projects}
         onCategoryCreated={() => queryClient.invalidateQueries({ queryKey: ['categories-list-calendar'] })}
+        onProjectCreated={() => queryClient.invalidateQueries({ queryKey: ['projects-list-calendar'] })}
         onSave={async (taskData) => {
           if (editingTask) {
             await updateTaskMutation.mutateAsync({ id: editingTask.id, data: taskData });

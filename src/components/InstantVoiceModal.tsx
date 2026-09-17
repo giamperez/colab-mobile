@@ -89,7 +89,7 @@ export const InstantVoiceModal: React.FC<InstantVoiceModalProps> = ({
   const bar7 = useRef(new Animated.Value(10)).current;
 
   // Silence auto-stop timer ref
-  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const transcriptRef = useRef('');
 
   // Fetch Users & Projects for NLP extraction

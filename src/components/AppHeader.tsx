@@ -21,6 +21,7 @@ import { ganttApi } from '../api/gantt.api';
 import { extractArray } from '../api/utils';
 import { AIAssistantModal } from './AIAssistantModal';
 import { InstantVoiceModal } from './InstantVoiceModal';
+import { TrashModal } from './TrashModal';
 
 export interface AppHeaderProps {
   title?: string;
@@ -61,6 +62,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const { showInfo, showSuccess } = useNotification();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [trashModalVisible, setTrashModalVisible] = useState(false);
   const [workspaceModalVisible, setWorkspaceModalVisible] = useState(false);
   const [projectModalVisible, setProjectModalVisible] = useState(false);
   const [aiModalVisible, setAiModalVisible] = useState(false);
@@ -358,7 +360,17 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       )}
 
       {/* Side Menu Drawer — consistent across every screen that renders AppHeader */}
-      <SidebarDrawer visible={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <SidebarDrawer
+        visible={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onOpenTrash={() => setTrashModalVisible(true)}
+      />
+
+      {/* Trash / Papelera Modal (30 days) */}
+      <TrashModal
+        visible={trashModalVisible}
+        onClose={() => setTrashModalVisible(false)}
+      />
 
       {/* Workspace Switcher Modal (Empresas) */}
       <WorkspaceSwitcherModal

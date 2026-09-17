@@ -18,6 +18,7 @@ import { groupsApi } from '../api/groups.api';
 import { usersApi } from '../api/users.api';
 import { categoriesApi } from '../api/categories.api';
 import { tasksApi } from '../api/tasks.api';
+import { projectsApi } from '../api/projects.api';
 import { extractArray } from '../api/utils';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { AppHeader } from '../components/AppHeader';
@@ -33,7 +34,7 @@ import {
   TaskStatus,
   PriorityLevel,
 } from '../types';
-import type { GanttItem, Group, User, Category, Task } from '../types';
+import type { GanttItem, Group, User, Category, Task, Project } from '../types';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import dayjs from 'dayjs';
@@ -54,7 +55,7 @@ export const ProjectsScreen = () => {
   const { colors, isDark } = useTheme();
 
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
-  const [expandedProjects, setExpandedProjects] = useState<Record<number, boolean>>({});
+  const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
 
   // Gantt Item Modals
   const [modalVisible, setModalVisible] = useState(false);
@@ -72,7 +73,7 @@ export const ProjectsScreen = () => {
   const [targetStatus, setTargetStatus] = useState<TaskStatus | null>(null);
 
   // Data fetching
-  const { data: rawItems, isLoading, refetch } = useQuery({
+  const { data: rawItems, isLoading: isGanttLoading, refetch: refetchGantt } = useQuery({
     queryKey: ['gantt-items', selectedGroup],
     queryFn: () =>
       ganttApi.getAll({ group_id: selectedGroup || undefined }).then((res) => res.data),
@@ -93,10 +94,87 @@ export const ProjectsScreen = () => {
     queryFn: () => categoriesApi.getAll().then((res) => res.data),
   });
 
+  const { data: rawProjects, isLoading: isProjectsLoading, refetch: refetchProjects } = useQuery({
+    queryKey: ['projects-list'],
+    queryFn: () => projectsApi.getAll().then((res) => res.data),
+  });
+
+  const { data: rawTasks, refetch: refetchTasks } = useQuery({
+    queryKey: ['tasks-kanban-all'],
+    queryFn: () => tasksApi.getAll({ includeDeleted: 'false' }).then((res) => res.data),
+  });
+
+  const isLoading = isGanttLoading || isProjectsLoading;
+
+  const onRefresh = async () => {
+    await Promise.all([refetchGantt(), refetchProjects(), refetchTasks()]);
+  };
+
   const items: GanttItem[] = useMemo(() => extractArray<GanttItem>(rawItems), [rawItems]);
   const groups: Group[] = useMemo(() => extractArray<Group>(rawGroups), [rawGroups]);
   const users: User[] = useMemo(() => extractArray<User>(rawUsers), [rawUsers]);
   const categories: Category[] = useMemo(() => extractArray<Category>(rawCategories), [rawCategories]);
+  const projects: Project[] = useMemo(() => extractArray<Project>(rawProjects), [rawProjects]);
+  const allTasks: Task[] = useMemo(() => extractArray<Task>(rawTasks), [rawTasks]);
+
+  // Unified list of projects and Gantt items so all web-created and mobile-created projects show up
+  const unifiedProjects = useMemo(() => {
+    const list: any[] = [];
+    const seenNames = new Set<string>();
+
+    // 1. Standard Projects from /projects (Web & Mobile)
+    projects.forEach((p) => {
+      const title = p.nombre || p.name || (p as any).title || (p as any).titulo || `Proyecto #${p.id}`;
+      seenNames.add(title.toLowerCase().trim());
+      
+      const linkedTasks = (p.tasks && p.tasks.length > 0)
+        ? p.tasks
+        : allTasks.filter((t: any) => t.project_id === p.id || t.projectId === p.id);
+
+      list.push({
+        id: `proj-${p.id}`,
+        rawId: p.id,
+        isStandardProject: true,
+        title: title,
+        nombre: title,
+        name: title,
+        description: p.descripcion || p.description || '',
+        color: p.color || '#7C83FF',
+        start_date: p.fechaInicio || p.startDate || p.createdAt,
+        end_date: p.fechaFin || p.endDate,
+        tasks: linkedTasks,
+        subtasks: linkedTasks,
+        type: 'Proyecto',
+      });
+    });
+
+    // 2. Gantt Plans from /gantt
+    items.forEach((item) => {
+      const title = (item as any).name || item.nombre || item.title || (item as any).titulo || `Plan #${item.id}`;
+      if (!seenNames.has(title.toLowerCase().trim())) {
+        const linkedTasks = (item.tasks && item.tasks.length > 0)
+          ? item.tasks
+          : (item.subtasks && item.subtasks.length > 0)
+          ? item.subtasks
+          : allTasks.filter((t: any) => t.gantt_item_id === item.id || t.ganttItemId === item.id);
+
+        list.push({
+          ...item,
+          id: `gantt-${item.id}`,
+          rawId: item.id,
+          isStandardProject: false,
+          title: title,
+          nombre: title,
+          name: title,
+          tasks: linkedTasks,
+          subtasks: linkedTasks,
+          type: item.type || (item as any).tipo || 'Plan',
+        });
+      }
+    });
+
+    return list;
+  }, [projects, items, allTasks]);
 
   // Mutations
   const createMutation = useMutation({
@@ -104,6 +182,7 @@ export const ProjectsScreen = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gantt-items'] });
       queryClient.invalidateQueries({ queryKey: ['gantt-list'] });
+      queryClient.invalidateQueries({ queryKey: ['projects-list'] });
     },
   });
 
@@ -112,6 +191,7 @@ export const ProjectsScreen = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gantt-items'] });
       queryClient.invalidateQueries({ queryKey: ['gantt-list'] });
+      queryClient.invalidateQueries({ queryKey: ['projects-list'] });
     },
   });
 
@@ -120,6 +200,15 @@ export const ProjectsScreen = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gantt-items'] });
       queryClient.invalidateQueries({ queryKey: ['gantt-list'] });
+      queryClient.invalidateQueries({ queryKey: ['projects-list'] });
+    },
+  });
+
+  const deleteProjectMutation = useMutation({
+    mutationFn: (id: number) => projectsApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects-list'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks-kanban-all'] });
     },
   });
 
@@ -135,6 +224,7 @@ export const ProjectsScreen = () => {
     mutationFn: (data: any) => tasksApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gantt-items'] });
+      queryClient.invalidateQueries({ queryKey: ['projects-list'] });
       queryClient.invalidateQueries({ queryKey: ['tasks-kanban-all'] });
       setTaskModalVisible(false);
       setSelectedGanttForTask(null);
@@ -145,6 +235,7 @@ export const ProjectsScreen = () => {
     mutationFn: ({ id, data }: { id: number; data: any }) => tasksApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gantt-items'] });
+      queryClient.invalidateQueries({ queryKey: ['projects-list'] });
       queryClient.invalidateQueries({ queryKey: ['tasks-kanban-all'] });
     },
   });
@@ -154,12 +245,14 @@ export const ProjectsScreen = () => {
       tasksApi.updateStatus(id, status, description),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gantt-items'] });
+      queryClient.invalidateQueries({ queryKey: ['projects-list'] });
       queryClient.invalidateQueries({ queryKey: ['tasks-kanban-all'] });
     },
   });
 
-  const toggleProjectExpand = (id: number) => {
-    setExpandedProjects((prev) => ({ ...prev, [id]: !prev[id] }));
+  const toggleProjectExpand = (id: string | number) => {
+    const key = String(id);
+    setExpandedProjects((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleToggleTaskStatus = async (taskItem: any) => {
@@ -168,16 +261,23 @@ export const ProjectsScreen = () => {
     await updateStatusMutation.mutateAsync({ id: taskItem.id, status: nextStatus });
   };
 
-  const handleDeleteProject = (item: GanttItem) => {
+  const handleDeleteProject = (item: any) => {
+    const projectName = item.title || item.nombre || item.name || item.titulo || 'Plan / Proyecto';
     Alert.alert(
       'Eliminar Plan / Proyecto',
-      `¿Deseas eliminar "${item.title || item.nombre}"?`,
+      `¿Deseas eliminar "${projectName}"?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Eliminar',
           style: 'destructive',
-          onPress: () => deleteMutation.mutate(item.id),
+          onPress: () => {
+            if (item.isStandardProject) {
+              deleteProjectMutation.mutate(item.rawId);
+            } else {
+              deleteMutation.mutate(item.rawId || item.id);
+            }
+          },
         },
       ]
     );
@@ -241,13 +341,13 @@ export const ProjectsScreen = () => {
         </View>
       ) : (
         <FlatList
-          data={items}
+          data={unifiedProjects}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={[
             styles.listContainer,
             { paddingBottom: Math.max(insets.bottom, 8) + 85 },
           ]}
-          refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={colors.primary} />}
+          refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor={colors.primary} />}
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <View style={[styles.emptyIconCircle, { backgroundColor: colors.bgSecondary }]}>
@@ -294,7 +394,7 @@ export const ProjectsScreen = () => {
                         <Text style={[styles.typeText, { color: projectColor }]}>{item.type || 'Plan'}</Text>
                       </View>
                       <Text style={[styles.projectTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                        {item.title || item.nombre || 'Plan de Trabajo'}
+                        {item.title || item.nombre || item.name || item.titulo || 'Plan de Trabajo'}
                       </Text>
                     </View>
 
@@ -542,10 +642,13 @@ export const ProjectsScreen = () => {
         categories={categories}
         ganttItems={items}
         groups={groups}
-        initialGanttItemId={selectedGanttForTask?.id}
+        projects={projects}
+        initialGanttItemId={(selectedGanttForTask as any)?.isStandardProject ? undefined : ((selectedGanttForTask as any)?.rawId || selectedGanttForTask?.id)}
+        initialProjectId={(selectedGanttForTask as any)?.isStandardProject ? ((selectedGanttForTask as any)?.rawId || selectedGanttForTask?.id) : undefined}
         initialStartDate={selectedGanttForTask?.start_date || (selectedGanttForTask as any)?.startDate}
         initialDueDate={selectedGanttForTask?.end_date || (selectedGanttForTask as any)?.endDate}
         onCategoryCreated={() => queryClient.invalidateQueries({ queryKey: ['categories-list'] })}
+        onProjectCreated={() => queryClient.invalidateQueries({ queryKey: ['projects-list'] })}
         onSave={async (taskData) => {
           if (editingTask) {
             await updateTaskMutation.mutateAsync({ id: editingTask.id, data: taskData });
